@@ -80,5 +80,5 @@ GNU General Public License v3.0
 ## Acknowledgments
 * <a href='https://github.com/eth-infinitism/account-abstraction'>eth-infinitism/account-abstraction</a>
 * <a href='https://github.com/safe-global/safe-contracts'>Gnosis Safe Contracts</a>
-* <a href='https://notes.ethereum.org/@vbuterin/cross_layer_2_bridges'>Document by @vbuterin descriping the bounty</a>
+* <a href='https://eips.ethereum.org/EIPS/eip-4337'>EIP-4337: Account Abstraction via Entry Point Contract specification </a>
 
