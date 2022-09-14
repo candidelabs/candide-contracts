@@ -10,13 +10,13 @@
 
 # About
 
-Candide Wallet is a smart contract based crypto wallet for the etherium mainnet and evm compatible rollups.<br/>
-This repo includes the smart contracts used by Candide wallet.
+Candide Wallet is a smart contract wallet for Ethereum Mainnet and EVM compatible rollups.<br/>
+This repo includes the smart contracts used by Candide Wallet.
 
 # Features
-- <a href="https://eips.ethereum.org/EIPS/eip-712">EIP-4337: Account Abstraction via Entry Point Contract</a> 
+- <a href="https://eips.ethereum.org/EIPS/eip-4337">EIP-4337: Account Abstraction via Entry Point Contract</a> 
 - Social Recovery
-- pay gas with erc20 using a paymaster
+- Pay gas with ERC-20 using a Paymaster
 
 # How to use this repo
 
@@ -35,10 +35,9 @@ pipx inject eth-brownie web3 brownie-token-tester ecdsa sha3
 npm install ganache
 ```
 
-### Rename .env.example to .env and add the follwoing values
+### Add required .env variables
 ```
-ETHERSCAN_TOKEN=
-WEB3_INFURA_PROJECT_ID=
+cp -a .env.example .env
 ```
 
 ### Add Goerli fork to brownie networks
@@ -80,5 +79,5 @@ GNU General Public License v3.0
 ## Acknowledgments
 * <a href='https://github.com/eth-infinitism/account-abstraction'>eth-infinitism/account-abstraction</a>
 * <a href='https://github.com/safe-global/safe-contracts'>Gnosis Safe Contracts</a>
-* <a href='https://notes.ethereum.org/@vbuterin/cross_layer_2_bridges'>Document by @vbuterin descriping the bounty</a>
+* <a href='https://eips.ethereum.org/EIPS/eip-4337'>EIP-4337: Account Abstraction via Entry Point Contract specification </a>
 
