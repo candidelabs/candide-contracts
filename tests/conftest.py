@@ -71,11 +71,39 @@ def moduleManager(EIP4337Manager, entryPoint, owner):
     return EIP4337Manager.deploy(entryPoint.address, {'from': owner})
 
 @pytest.fixture(scope="module")
+def candideWalletSingleton(CandideWallet, entryPoint, owner):
+    """
+    Fetch GnosisSafe Singleton Contract from the specified address
+    """
+    return CandideWallet.deploy(entryPoint.address, {'from': owner})
+
+@pytest.fixture(scope="module")
 def gnosisSafeSingleton():
     """
     Fetch GnosisSafe Singleton Contract from the specified address
     """
     return Contract.from_explorer(gnosis_safe_singleton_addr)
+
+@pytest.fixture(scope="module")
+def candideWalletProxy(CandideWalletProxy, owner, candideWalletSingleton):
+    """
+    Deploy a proxy contract for GnosisSafe
+    """
+    contract = CandideWalletProxy.deploy(candideWalletSingleton.address,
+        {'from': owner})
+    #returning a proxy instance with the target abi to facilitate diligate call
+    cwp = Contract.from_abi("CandideWallet", contract.address, candideWalletSingleton.abi)
+
+    cwp.setup([owner.address],  #owners
+        1,                      #threshold
+        '0x0000000000000000000000000000000000000000',
+        bytes(0),
+        '0x0000000000000000000000000000000000000000',
+        '0x0000000000000000000000000000000000000000',
+        0,
+        '0x0000000000000000000000000000000000000000',{'from': owner})
+    
+    return cwp
 
 @pytest.fixture(scope="module")
 def safeProxy(SafeProxy4337, moduleManager, owner, gnosisSafeSingleton, friends):
