@@ -59,9 +59,20 @@ brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
 ```
 brownie compile
 ```
-## Run all tests
+### Run all tests
 ```
 brownie test --network goerli-fork-dev
+```
+
+### Deploy contracts to local goerli fork
+```
+brownie run scripts/deploy.py --network goerli-fork-dev -i
+
+```
+
+### Deploy contracts to goerli
+```
+brownie run scripts/deploy.py --network goerli -i
 ```
 
 ## TODO
