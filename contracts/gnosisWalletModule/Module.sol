@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: GPL
+// SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity ^0.8.12;
 import "./MasterCopy.sol";
 import "./EIP4337Manager.sol";
