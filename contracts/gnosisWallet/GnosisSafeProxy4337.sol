@@ -18,18 +18,14 @@ import "@safe-global/safe-contracts/contracts/proxies/GnosisSafeProxy.sol";
 contract SafeProxy4337 is GnosisSafeProxy {
     constructor(
         address singleton, EIP4337Manager aaModule,
-        address owner,
-		address[] memory _friends, 
-		uint256 _friendsThreshold
+        address owner
     ) GnosisSafeProxy(singleton) {
 		address[] memory owners = new address[](1);
         owners[0] = owner;
 
 		(bool success,bytes memory ret) = address(aaModule).delegatecall(
-			//abi.encodeWithSignature(
-                //"setupEIP4337(address,EIP4337Manager,address[],bytes)",
 			abi.encodeWithSelector(EIP4337Manager.setupEIP4337.selector,
-                 singleton, aaModule, owners, '0x', _friends, _friendsThreshold
+                 singleton, aaModule, owners, '0x'
 			)
 		);
 

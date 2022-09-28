@@ -6,7 +6,6 @@ import "@safe-global/safe-contracts/contracts/GnosisSafe.sol";
 import "./EIP4337Fallback.sol";
 import "../../interfaces/EntryPoint.sol";
 import "../../interfaces/IWallet.sol";
-import "./SocialRecoveryModule.sol";
 
 /// @author eth-infinitism/account-abstraction - https://github.com/eth-infinitism/account-abstraction
 /// @author modified by CandideWallet Team
@@ -23,11 +22,10 @@ contract EIP4337Manager is GnosisSafe, IWallet {
 
     address public immutable eip4337Fallback;
     address public immutable entryPoint;
-	address public immutable socialRecoveryModule;
+
     constructor(address anEntryPoint) {
         entryPoint = anEntryPoint;
         eip4337Fallback = address(new EIP4337Fallback(address(this)));
-		socialRecoveryModule = address(new SocialRecoveryModule());
     }
 
     /**
@@ -61,16 +59,12 @@ contract EIP4337Manager is GnosisSafe, IWallet {
      * called from the GnosisSafeProxy4337 during construction time
      * - enable 3 modules (this module, fallback and the entrypoint)
      * - this method is called with delegateCall, so the module (usually itself) is passed as parameter, and "this" is the safe itself
-	/// @param _friends List of friends' addresses.
-    /// @param _friendsThreshold Required number of friends to confirm replacement.
      */
     function setupEIP4337(
         address singleton,
         EIP4337Manager manager,
         address[] calldata owners,
-		bytes calldata EmptyBytes,
-		address[] memory _friends, 
-		uint256 _friendsThreshold
+		bytes calldata EmptyBytes
     ) external {
         address eip4337fallback = manager.eip4337Fallback();
         uint threshold = 1;
@@ -83,17 +77,6 @@ contract EIP4337Manager is GnosisSafe, IWallet {
             )),
             Enum.Operation.DelegateCall, gasleft()
         );
-
-        require(_friendsThreshold != 1, "Friends threshold can't be 1");
-        
-        if(_friendsThreshold >= 2){
-            execute(socialRecoveryModule, 0, abi.encodeCall(SocialRecoveryModule.setup, (
-                _friends, _friendsThreshold
-                )),
-                Enum.Operation.Call, gasleft()
-            );
-            _enableModule(socialRecoveryModule);
-        }
 
         _enableModule(manager.entryPoint());
         _enableModule(eip4337fallback);

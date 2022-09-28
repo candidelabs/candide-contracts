@@ -189,7 +189,7 @@ def test_transaction_through_entrypoint(safeProxy, owner, bundler, receiver,
         entryPoint)
     assert beforeBalance + 5 == receiver.balance()
 
-def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, 
+def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialRecoveryModule,
         gnosisSafeSingleton, owner, bundler, receiver, notOwner,
         entryPoint, accounts, SocialRecoveryModule, friends):
     """
@@ -199,11 +199,10 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy,
 
     #initCode for deploying a new SafeProxy contract by the entrypoint
     walletProxyBytecode = SafeProxy4337.bytecode
-    friendsAddresses = [friends[0].address, friends[1].address]
     walletProxyArgsEncoded = eth_abi.encode_abi(
-            ['address', 'address', 'address', 'address[]', 'uint256'],
+            ['address', 'address', 'address'],
             [gnosisSafeSingleton.address, moduleManager.address,
-                owner.address, friendsAddresses, 2]).hex()
+                owner.address]).hex()
     initCode = walletProxyBytecode + walletProxyArgsEncoded
     
     #send eth to the SafeProxy Contract address before deploying the SafeProxy contract
@@ -243,12 +242,77 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy,
     """
     Test Social Recovry module - separate confirmations and recovery process
     """
-    #check if social recovery module is deployed
-    socialRecoveryModuleAddress = moduleManager.socialRecoveryModule()
-    srm = Contract.from_abi("SocialRecoveryModule", socialRecoveryModuleAddress, SocialRecoveryModule.abi)
+    # add social recovery module contract to enabled modules
+    friendsAddresses = [friends[0].address, friends[1].address]
+    callData = safeProxy.enableModule.encode_input(socialRecoveryModule.address)
+    nonce = safeProxy.nonce()
+
+    tx_hash = safeProxy.getTransactionHash(
+        safeProxy.address,
+        0,
+        callData,
+        0,
+        215000,
+        215000,
+        100000,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        nonce)
+        
+    contract_transaction_hash = HexBytes(tx_hash)
+    ownerSigner = Account.from_key(owner.private_key)
+    signature = ownerSigner.signHash(contract_transaction_hash)
+
+    safeProxy.execTransaction(
+        safeProxy.address,
+        0,
+        callData,
+        0,
+        215000,
+        215000,
+        100000,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+       signature.signature.hex(), {'from':owner})
+
+    #check if moduel is enabled
+    assert safeProxy.isModuleEnabled(socialRecoveryModule.address)
+
+    # setup social recovery module - must be through a safe execTransaction call
+    callData = socialRecoveryModule.setup.encode_input(friendsAddresses, 2)
+    nonce = safeProxy.nonce()
+
+    tx_hash = safeProxy.getTransactionHash(
+        socialRecoveryModule.address,
+        0,
+        callData,
+        0,
+        215000,
+        215000,
+        100000,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        nonce)
+        
+    contract_transaction_hash = HexBytes(tx_hash)
+    ownerSigner = Account.from_key(owner.private_key)
+    signature = ownerSigner.signHash(contract_transaction_hash)
+
+    safeProxy.execTransaction(
+        socialRecoveryModule.address,
+        0,
+        callData,
+        0,
+        215000,
+        215000,
+        100000,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+       signature.signature.hex(), {'from':owner})
+
     #check friends
-    assert srm.friends(0) == friends[0]
-    assert srm.friends(1) == friends[1]
+    assert socialRecoveryModule.friends(0) == friends[0]
+    assert socialRecoveryModule.friends(1) == friends[1]
 
     #create recovery data to initiate a recovry to a new owner
     newOwner = accounts[5]
@@ -257,27 +321,30 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy,
         prevOwner,
         owner.address,
         newOwner.address)
-    dataHash = srm.getDataHash(recoveryData, {'from': friends[0]})
+    dataHash = socialRecoveryModule.getDataHash(recoveryData, {'from': friends[0]})
     
     #will revert no friends confirmed 
-    assert srm.isConfirmedByRequiredFriends(dataHash, {'from': friends[0]}) == False
+    assert socialRecoveryModule.isConfirmedByRequiredFriends(dataHash, 
+        {'from': friends[0]}) == False
     with reverts(): 
-        srm.recoverAccess(prevOwner, owner.address,
+        socialRecoveryModule.recoverAccess(prevOwner, owner.address,
             newOwner.address, {'from': friends[0]})
 
-    srm.confirmTransaction(dataHash, {'from': friends[0]})
+    socialRecoveryModule.confirmTransaction(dataHash, {'from': friends[0]})
     
     #will revert number of confirmation is less than threshold = 2
-    assert srm.isConfirmedByRequiredFriends(dataHash, {'from': friends[0]}) == False
+    assert socialRecoveryModule.isConfirmedByRequiredFriends(dataHash, 
+        {'from': friends[0]}) == False
     with reverts():
-        srm.recoverAccess(prevOwner, owner.address,
+        socialRecoveryModule.recoverAccess(prevOwner, owner.address,
             newOwner.address, {'from': friends[0]})
 
-    srm.confirmTransaction(dataHash, {'from': friends[1]})
+    socialRecoveryModule.confirmTransaction(dataHash, {'from': friends[1]})
 
     #recovery process will succeed if number of confirmation is equal or bigger than threshold = 2
-    assert srm.isConfirmedByRequiredFriends(dataHash, {'from': friends[0]}) == True
-    srm.recoverAccess(prevOwner, owner.address,
+    assert socialRecoveryModule.isConfirmedByRequiredFriends(dataHash, 
+        {'from': friends[0]}) == True
+    socialRecoveryModule.recoverAccess(prevOwner, owner.address,
         newOwner.address, {'from': friends[0]})
     
     #check old owner is not owner anymore
@@ -297,11 +364,11 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy,
         prevOwner,
         owner.address,
         newOwner.address)
-    dataHash = srm.getDataHash(recoveryData, {'from': friends[0]})
+    dataHash = socialRecoveryModule.getDataHash(recoveryData, {'from': friends[0]})
 
     #will revert no friends confirmed 
     with reverts(): 
-        srm.recoverAccess(prevOwner, owner.address,
+        socialRecoveryModule.recoverAccess(prevOwner, owner.address,
             newOwner.address, {'from': friends[0]})
     
     friend0Signer = w3.eth.account.from_key(friends[0].private_key)
@@ -315,11 +382,11 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy,
 
     #will revert if wrong signatures
     with reverts():
-        srm.confirmAndRecoverAccess(prevOwner, owner.address,
+        socialRecoveryModule.confirmAndRecoverAccess(prevOwner, owner.address,
             newOwner.address, [sigNotOwner.signature.hex(), sigFriend1.signature.hex()], 
             {'from': friends[0]})
     
-    srm.confirmAndRecoverAccess(prevOwner, owner.address,
+    socialRecoveryModule.confirmAndRecoverAccess(prevOwner, owner.address,
         newOwner.address, [sigFriend0.signature.hex(), sigFriend1.signature.hex()], 
         {'from': friends[0]})
 

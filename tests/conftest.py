@@ -1,7 +1,7 @@
 #!/user/bin/python3
 
 import pytest
-from brownie import Contract, EIP4337Manager, SafeProxy4337, VerifyingPaymaster, DepositPaymaster
+from brownie import Contract, EIP4337Manager, SafeProxy4337, VerifyingPaymaster, DepositPaymaster, SocialRecoveryModule
 from brownie_tokens import ERC20
 
 entryPoint_addr = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69" #Goerli
@@ -71,6 +71,13 @@ def moduleManager(EIP4337Manager, entryPoint, owner):
     return EIP4337Manager.deploy(entryPoint.address, {'from': owner})
 
 @pytest.fixture(scope="module")
+def socialRecoveryModule(SocialRecoveryModule, owner):
+    """
+    Deploy EIP4337Manager contract
+    """
+    return SocialRecoveryModule.deploy({'from': owner})
+
+@pytest.fixture(scope="module")
 def gnosisSafeSingleton():
     """
     Fetch GnosisSafe Singleton Contract from the specified address
@@ -83,7 +90,7 @@ def safeProxy(SafeProxy4337, moduleManager, owner, gnosisSafeSingleton, friends)
     Deploy a proxy contract for GnosisSafe
     """ 
     sp = SafeProxy4337.deploy(gnosisSafeSingleton.address, moduleManager.address, 
-            owner.address, friends, 2, {'from': owner})
+            owner.address, {'from': owner})
     #returning a proxy instance with the target abi to facilitate diligate call
     return Contract.from_abi("GnosisSafe", sp.address, gnosisSafeSingleton.abi)
 
