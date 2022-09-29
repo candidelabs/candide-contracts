@@ -280,39 +280,23 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
 
     # setup social recovery module - must be through a safe execTransaction call
     callData = socialRecoveryModule.setup.encode_input(friendsAddresses, 2)
-    nonce = safeProxy.nonce()
-
-    tx_hash = safeProxy.getTransactionHash(
-        socialRecoveryModule.address,
-        0,
-        callData,
-        0,
-        215000,
-        215000,
-        100000,
-        "0x0000000000000000000000000000000000000000",
-        "0x0000000000000000000000000000000000000000",
-        nonce)
-        
-    contract_transaction_hash = HexBytes(tx_hash)
-    ownerSigner = Account.from_key(owner.private_key)
-    signature = ownerSigner.signHash(contract_transaction_hash)
-
-    safeProxy.execTransaction(
-        socialRecoveryModule.address,
-        0,
-        callData,
-        0,
-        215000,
-        215000,
-        100000,
-        "0x0000000000000000000000000000000000000000",
-        "0x0000000000000000000000000000000000000000",
-       signature.signature.hex(), {'from':owner})
+    ExecuteSocialRecoveryOperation(callData, safeProxy, socialRecoveryModule, owner)
 
     #check friends
-    assert socialRecoveryModule.friends(0) == friends[0]
-    assert socialRecoveryModule.friends(1) == friends[1]
+    assert socialRecoveryModule.isFriend(friends[0])
+    assert socialRecoveryModule.isFriend(friends[1])
+
+    #add friend
+    newFriend = accounts[4].address
+    callData = socialRecoveryModule.addFriendWithThreshold.encode_input(
+        newFriend, 3)
+    ExecuteSocialRecoveryOperation(callData, safeProxy, socialRecoveryModule, owner)
+    assert socialRecoveryModule.isFriend(newFriend)
+
+    #remove friend
+    callData = socialRecoveryModule.removeFriend.encode_input(2, 2)
+    ExecuteSocialRecoveryOperation(callData, safeProxy, socialRecoveryModule, owner)
+    assert socialRecoveryModule.isFriend(newFriend) == False
 
     #create recovery data to initiate a recovry to a new owner
     newOwner = accounts[5]
@@ -395,6 +379,7 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
 
     #check new owner is the current owner
     assert safeProxy.isOwner(newOwner, {'from': notOwner}) == True
+
 
 def test_transfer_from_entrypoint_with_deposit_paymaster(safeProxy, tokenErc20, 
         owner, bundler, entryPoint, depositPaymaster, receiver, accounts):

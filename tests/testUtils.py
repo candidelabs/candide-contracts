@@ -206,3 +206,40 @@ def ExecuteEntryPointHandleOps(
     op[11] = sig.signature
     #call the entrypoint
     return entryPoint.handleOps([op], bundler, {'from': bundler})
+
+
+def ExecuteSocialRecoveryOperation(
+        callData, 
+        safeProxyContract,
+        socialRecoveryModule,
+        owner
+        ):
+    nonce = safeProxyContract.nonce()
+
+    tx_hash = safeProxyContract.getTransactionHash(
+        socialRecoveryModule.address,
+        0,
+        callData,
+        0,
+        215000,
+        215000,
+        100000,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        nonce)
+        
+    contract_transaction_hash = HexBytes(tx_hash)
+    ownerSigner = Account.from_key(owner.private_key)
+    signature = ownerSigner.signHash(contract_transaction_hash)
+
+    safeProxyContract.execTransaction(
+        socialRecoveryModule.address,
+        0,
+        callData,
+        0,
+        215000,
+        215000,
+        100000,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+       signature.signature.hex(), {'from':owner})

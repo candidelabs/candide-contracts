@@ -38,7 +38,7 @@ contract SocialRecoveryModule is Module {
         public
     {
         require(_threshold <= _friends.length, "Threshold cannot exceed friends count");
-        require(_threshold >= 2, "At least 2 friends required");
+        require(_threshold >= 1, "At least 1 friends required");
         setManager();
         // Set allowed friends.
         for (uint256 i = 0; i < _friends.length; i++) {
@@ -130,5 +130,40 @@ contract SocialRecoveryModule is Module {
         returns (bytes32)
     {
         return keccak256(data);
+    }
+
+    /// @dev Allows to add a new friend update the threshold at the same time.
+    /// @param friend New friend address.
+    /// @param _threshold New threshold.
+    function addFriendWithThreshold(address friend, uint256 _threshold) public authorized {
+        //friend address cannot be null, and no duplicates
+        require(friend != address(0) && !isFriend[friend], "Invalide friend to add");
+        friends.push(friend);
+        isFriend[friend] = true;
+
+        // Change threshold if threshold was changed.
+        if (threshold != _threshold){ 
+            require(_threshold <= friends.length, "Threshold cannot exceed friends count");
+            threshold = _threshold;
+        }
+    }
+
+    /// @dev Allows to remove a friend and update the threshold at the same time.
+    /// @notice Friends array order may change.
+    /// @param friendIndex is the index of the friend to be removed in the friends array.
+    /// @param _threshold New threshold.
+    function removeFriend(uint friendIndex, uint256 _threshold) public authorized {
+        // Only allow to remove a friend, if threshold can still be reached.
+        require(friends.length - 1 >= _threshold, "Threshold cannot exceed friends count");
+        // Validate friendIndex to be less than array length
+        require(friendIndex < friends.length, "Invalide friend index");
+        
+        isFriend[friends[friendIndex]] = false;
+        //replace friend with last friend in the array
+        friends[friendIndex] = friends[friends.length-1];
+        friends.pop();
+        
+        //update threshold
+        threshold = _threshold;
     }
 }
