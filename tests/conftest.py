@@ -3,9 +3,11 @@
 import pytest
 from brownie import Contract, EIP4337Manager, SafeProxy4337, VerifyingPaymaster, DepositPaymaster, SocialRecoveryModule
 from brownie_tokens import ERC20
+from eth_account import Account
 
 entryPoint_addr = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69" #Goerli
 gnosis_safe_singleton_addr = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E" #Goerli - V1.3.0
+bundler_pk="e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4" #should be the same as the bundler's RPC
 
 @pytest.fixture(scope="function", autouse=True)
 def isolate(fn_isolation):
@@ -34,8 +36,7 @@ def bundler(accounts):
     """
     The bundler account
     """
-    accounts.add()
-    return accounts[-1]
+    return accounts.add(bundler_pk)
 
 @pytest.fixture(scope="module")
 def receiver(accounts):
