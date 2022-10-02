@@ -29,7 +29,7 @@ def main():
    
     manager = EIP4337Manager.deploy(entryPoint_addr, {'from': owner})
     safeProxy = SafeProxy4337.deploy(gnosis_safe_singleton_addr, manager.address, 
-            owner.address, friends, 2, {'from': owner})
+            owner.address,{'from': owner})
     
     depositPaymaster =  DepositPaymaster.deploy(entryPoint_addr, {'from': owner})
     uniOracle = TokenPriceOracle.deploy({'from':owner})
