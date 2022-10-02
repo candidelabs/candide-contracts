@@ -39,7 +39,7 @@ contract VerifyingPaymaster is BasePaymaster {
     public pure returns (bytes32) {
         //can't use userOp.hash(), since it contains also the paymasterData itself.
         return keccak256(abi.encode(
-                userOp.getSender(),
+                userOp.sender,
                 userOp.nonce,
                 keccak256(userOp.initCode),
                 keccak256(userOp.callData),
