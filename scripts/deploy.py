@@ -1,4 +1,4 @@
-from brownie import Contract, SafeProxy4337, EIP4337Manager, TokenPriceOracle, DepositPaymaster, VerifyingPaymaster, accounts, network
+from brownie import Contract, SafeProxy4337, EIP4337Manager, TokenPriceOracle, DepositPaymaster, CandidePaymaster, accounts, network
 from brownie_tokens import ERC20
 
 #Goerli Deployed Contracts
@@ -35,4 +35,4 @@ def main():
     uniOracle = TokenPriceOracle.deploy({'from':owner})
     depositPaymaster.addToken(uni.address, uniOracle.address)
 
-    VerifyingPaymaster.deploy(entryPoint_addr, bundler, {'from': bundler})
+    CandidePaymaster.deploy(entryPoint_addr, bundler, {'from': bundler})
