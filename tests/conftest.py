@@ -1,13 +1,14 @@
 #!/user/bin/python3
 
 import pytest
-from brownie import Contract, EIP4337Manager, SafeProxy4337, VerifyingPaymaster, DepositPaymaster, SocialRecoveryModule
+from brownie import Contract, EIP4337Manager, SafeProxy4337, CandidePaymaster, DepositPaymaster, SocialRecoveryModule
 from brownie_tokens import ERC20
 from eth_account import Account
 
 entryPoint_addr = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69" #Goerli
 gnosis_safe_singleton_addr = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E" #Goerli - V1.3.0
 bundler_pk="e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4" #should be the same as the bundler's RPC
+SingletonFactory_add='0xce0042B868300000d44A59004Da54A005ffdcf9f'
 
 @pytest.fixture(scope="function", autouse=True)
 def isolate(fn_isolation):
@@ -65,6 +66,13 @@ def entryPoint(Contract):
     return Contract.from_explorer(entryPoint_addr)
 
 @pytest.fixture(scope="module")
+def SingletonFactory(Contract):
+    """
+    Fetch EntryPoint Contract from the specified address
+    """
+    return Contract.from_explorer(SingletonFactory_add)
+
+@pytest.fixture(scope="module")
 def moduleManager(EIP4337Manager, entryPoint, owner):
     """
     Deploy EIP4337Manager contract
@@ -103,11 +111,11 @@ def simpleWallet(SimpleWallet, entryPoint, owner):
     return SimpleWallet.deploy(entryPoint.address, owner.address, {"from":owner})
 
 @pytest.fixture(scope="module")
-def verifyingPaymaster(VerifyingPaymaster, entryPoint, bundler):
+def candidePaymaster(CandidePaymaster, entryPoint, bundler):
     """
-    Deploy VerifyingPaymaster contract
+    Deploy CandidePaymaster contract
     """ 
-    return VerifyingPaymaster.deploy(entryPoint.address, bundler, {'from': bundler})
+    return CandidePaymaster.deploy(entryPoint.address, bundler, {'from': bundler})
 
 @pytest.fixture(scope="module")
 def depositPaymaster(DepositPaymaster, entryPoint, TokenPriceOracle, tokenErc20, owner):

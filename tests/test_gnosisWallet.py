@@ -157,8 +157,8 @@ def test_transaction_through_entrypoint(safeProxy, owner, bundler, receiver,
             215000,
             645000,
             21000,
-            17530000000,
-            17530000000,
+            1000000,
+            1000000,
             '0x0000000000000000000000000000000000000000',
             '0x',
             '0x'
@@ -229,8 +229,8 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
             215000,
             645000,
             21000,
-            17530000000,
-            17530000000,
+            1000000,
+            1000000,
             '0x0000000000000000000000000000000000000000',
             '0x',
             '0x'
@@ -421,8 +421,8 @@ def test_transfer_from_entrypoint_with_deposit_paymaster(safeProxy, tokenErc20,
    
     assert beforeBalance + 5 == receiver.balance() #verifing eth is sent
 
-def test_transfer_from_entrypoint_with_verification_paymaster(safeProxy, tokenErc20, 
-        owner, bundler, entryPoint, verifyingPaymaster, receiver, accounts):
+def test_transfer_from_entrypoint_with_candidePaymaster(safeProxy, tokenErc20, 
+        owner, bundler, entryPoint, candidePaymaster, receiver, accounts):
     """
     Test sponsor transaction fees with erc20 with a verification paymaster
     """
@@ -430,73 +430,92 @@ def test_transfer_from_entrypoint_with_verification_paymaster(safeProxy, tokenEr
     beforeBalance = receiver.balance()
 
     accounts[0].transfer(bundler, "3 ether")
-    verifyingPaymaster.addStake(100, {'from':bundler, 'value': "1 ether"})
-    verifyingPaymaster.deposit({'from':bundler, 'value': "1 ether"})
+    candidePaymaster.addStake(100, {'from':bundler, 'value': "1 ether"})
+    candidePaymaster.deposit({'from':bundler, 'value': "1 ether"})
 
-    tokenErc20.approve(verifyingPaymaster.address, "1 ether", {'from':bundler})
     tokenErc20.transfer(safeProxy.address, "1 ether", {'from':bundler})
-    bundlerBalance = tokenErc20.balanceOf(bundler)
-
-    tx_hash = safeProxy.getTransactionHash(
-        receiver.address,
-        5,  #value to send
-        "0x",
+    
+    ops = []
+    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, 10**8)
+    callData = safeProxy.execTransactionFromModule.encode_input(
+            tokenErc20.address,
+            0,
+            approveCallData,
+            0)
+    op = [
+        safeProxy.address,
         0,
-        215000,
-        215000,
-        100000,
-        tokenErc20.address,
-        bundler.address,
-        1)
+        bytes(0),
+        callData,
+        2150000,
+        645000,
+        21000,
+        1000000,
+        1000000,
+        candidePaymaster.address,
+        bytes(0),
+        bytes(0)
+        ]
+
+    datahash = candidePaymaster.getHash(op)
+    bundlerSigner = w3.eth.account.from_key(bundler.private_key)
+    sig = bundlerSigner.signHash(datahash)
         
-    contract_transaction_hash = HexBytes(tx_hash)
-    ownerSigner = Account.from_key(owner.private_key)
-    signature = ownerSigner.signHash(contract_transaction_hash)
+    paymasterData = str("{0:0{1}x}".format(5,40)) + str("{0:0{1}x}".format(10**18,40)) + tokenErc20.address[2:] + sig.signature.hex()[2:]
 
-    callData = safeProxy.execTransaction.encode_input(
+    op[10] = paymasterData
+
+    requestId = entryPoint.getRequestId(op)
+    
+    ownerSigner = w3.eth.account.from_key(owner.private_key)
+    message_hash = defunct_hash_message(requestId)
+    sig = ownerSigner.signHash(message_hash)
+    op[11] = sig.signature
+
+    ops.append(op)
+
+    paymasterBalance = tokenErc20.balanceOf(candidePaymaster.address)
+
+    callData = safeProxy.execTransactionFromModule.encode_input(
         receiver.address,
-        5,  #value to send
+        5,
         "0x",
-        0,
-        215000,
-        215000,
-        100000,
-        tokenErc20.address,
-        bundler.address,
-        signature.signature.hex())
+        0)
 
     op = [
             safeProxy.address,
-            0,
+            1,
             bytes(0),
             callData,
             2150000,
             645000,
             21000,
-            17530000000,
-            17530000000,
-            verifyingPaymaster.address,
+            1000000,
+            1000000,
+            candidePaymaster.address,
             '0x',
             '0x'
             ]
-    datahash = verifyingPaymaster.getHash(op)
+
+    
+    datahash = candidePaymaster.getHash(op)
     bundlerSigner = w3.eth.account.from_key(bundler.private_key)
     sig = bundlerSigner.signHash(datahash)
 
-    paymasterData =  sig.signature
+    paymasterData = str("{0:0{1}x}".format(5,40)) + str("{0:0{1}x}".format(10**18,40)) + tokenErc20.address[2:] + sig.signature.hex()[2:]
 
     op = [
             safeProxy.address,
-            0,
+            1,
             bytes(0),
             callData,
             2150000,
             645000,
             21000,
-            17530000000,
-            17530000000,
-            verifyingPaymaster.address,
-            paymasterData.hex(),
+            1000000,
+            1000000,
+            candidePaymaster.address,
+            paymasterData,
             '0x'
             ]
     
@@ -505,11 +524,13 @@ def test_transfer_from_entrypoint_with_verification_paymaster(safeProxy, tokenEr
     message_hash = defunct_hash_message(requestId)
     sig = ownerSigner.signHash(message_hash)
     op[11] = sig.signature
-    gasused2 = entryPoint.handleOps([op], bundler, {'from': bundler})
+
+    ops.append(op)
+    gasused2 = entryPoint.handleOps(ops, bundler, {'from': bundler})
 
    
     assert beforeBalance + 5 == receiver.balance() #verifing eth is sent
-    assert tokenErc20.balanceOf(bundler) > bundlerBalance #verify bundler is payed
+    assert tokenErc20.balanceOf(candidePaymaster.address) > paymasterBalance #verify paymaster is payed
 
 def test_validate_module_manager(moduleManager, safeProxy, entryPoint, owner, accounts):
     """
@@ -526,8 +547,8 @@ def test_validate_module_manager(moduleManager, safeProxy, entryPoint, owner, ac
             215000,
             645000,
             21000,
-            17530000000,
-            17530000000,
+            1000000,
+            1000000,
             '0x0000000000000000000000000000000000000000',
             '0x',
             '0x'

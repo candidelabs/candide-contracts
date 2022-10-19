@@ -6,68 +6,76 @@ from eth_account.messages import defunct_hash_message
 from eth_account import Account
 from hexbytes import HexBytes
 import requests
+import eth_abi
+import random
+import os
 
-#This test should be run while the bundler JSON RPC server is running
-
-def get_test_safeTransactions(N, safeProxy, tokenErc20, verifyingPaymaster,
-    entryPoint, bundler, owner, receiver, accounts):
+def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
+    entryPoint, bundler, owner, receiver):
+    """
+    Generate Operations to used for the test
+    """
     ops = []
-    nonce = safeProxy.nonce({'from': owner})
-    for i in range(N):
-        tr=[
-            receiver.address,
-            5,
-            0,
-            0,
-            215000,
-            215000,
-            100000,
+
+    #to use the paymaster, every bundle should start with and approve operation that
+    # cover the cost for the hall bundle 
+    tokenErc20.transfer(safeProxy.address, "2 ether", {'from':bundler})
+    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, 10**8)
+    callData = safeProxy.execTransactionFromModule.encode_input(
             tokenErc20.address,
-            bundler.address,
-            N+i
-        ]
-        
-        tx_hash = safeProxy.getTransactionHash(
-        tr[0],
-        tr[1],
-        tr[2],
-        tr[3],
-        tr[4],
-        tr[5],
-        tr[6],
-        tr[7],
-        tr[8],
-        tr[9])
-
-        contract_transaction_hash = HexBytes(tx_hash)
-        ownerSigner = Account.from_key(owner.private_key)
-        signature = ownerSigner.signHash(contract_transaction_hash)
-
-        callData = safeProxy.execTransaction.encode_input(
-        tr[0],
-        tr[1],
-        tr[2],
-        tr[3],
-        tr[4],
-        tr[5],
-        tr[6],
-        tr[7],
-        tr[8],
-        signature.signature.hex())
-
-        op = [
+            0,
+            approveCallData,
+            0)
+    op = [
         safeProxy.address,
-        i,
+        0,
         bytes(0),
         callData,
         2150000,
         645000,
         21000,
-        17530000000,
-        17530000000,
-        verifyingPaymaster.address,
+        1000000,
+        1000000,
+        candidePaymaster.address,
         bytes(0),
         bytes(0)
+        ]
+        
+    paymasterData = callPaymaster(op)
+
+    op[10] = paymasterData
+
+    requestId = entryPoint.getRequestId(op)
+    
+    ownerSigner = w3.eth.account.from_key(owner.private_key)
+    message_hash = defunct_hash_message(requestId)
+    sig = ownerSigner.signHash(message_hash)
+    op[11] = sig.signature
+
+    op.append(0)    #set the random salt to zero if there is no initCode
+    ops.append(op)  #add op to the bundle
+
+    for i in range(N):       
+        #send 5 wei to receiver 
+        callData = safeProxy.execTransactionFromModule.encode_input(
+            receiver.address,
+            5,
+            "0x",
+            0)
+
+        op = [
+            safeProxy.address,
+            i+1,
+            bytes(0),
+            callData,
+            2150000,
+            645000,
+            21000,
+            1000000,
+            1000000,
+            candidePaymaster.address,
+            bytes(0),
+            bytes(0)
         ]
         
         paymasterData = callPaymaster(op)
@@ -81,37 +89,171 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, verifyingPaymaster,
         sig = ownerSigner.signHash(message_hash)
         op[11] = sig.signature
 
-        ops.append(op)
+        op.append(0) #set the random salt to zero if there is no initCode
+        
+        ops.append(op)  #add op to the bundle
 
     return ops
 
-def test_transfer_from_entrypoint_with_verification_paymaster(
+#This test should be run while the bundler JSON RPC server is running
+def test_transfer_from_entrypoint_with_candidePaymaster(
     safeProxy, tokenErc20,
-    owner, bundler, entryPoint, verifyingPaymaster, receiver, accounts):
+    owner, bundler, entryPoint, candidePaymaster, receiver, accounts):
     """
-    Test sponsor transaction fees with erc20 with a verification paymaster
+    Test sponsor transaction fees with erc20 with a paymaster
     """
-    N = 10
-    safeTransactions = get_test_safeTransactions(N,safeProxy, tokenErc20, verifyingPaymaster,
-    entryPoint, bundler, owner, receiver, accounts)
-    #assert False
-    accounts[0].transfer(safeProxy, "1 ether")
+    N = 10 #number of operations to generate in the bundle
+    safeTransactions = get_test_safeTransactions(N,safeProxy, tokenErc20, candidePaymaster,
+    entryPoint, bundler, owner, receiver)
+    
+    accounts[0].transfer(safeProxy, "1 ether") #add ether to the wallet
+    accounts[0].transfer(bundler, "3 ether")   #add ether to the bundler
+    
     beforeBalance = receiver.balance()
 
-    accounts[0].transfer(bundler, "3 ether")
-    verifyingPaymaster.addStake(100, {'from':bundler, 'value': "1 ether"})
-    verifyingPaymaster.deposit({'from':bundler, 'value': "1 ether"})
+    #addStake for the EntryPoint
+    candidePaymaster.addStake(100, {'from':bundler, 'value': "1 ether"})
+    candidePaymaster.deposit({'from':bundler, 'value': "1 ether"})
 
-    tokenErc20.approve(verifyingPaymaster.address, "1 ether", {'from':bundler})
+
+    tokenErc20.approve(candidePaymaster.address, "1 ether", {'from':bundler})
     tokenErc20.transfer(safeProxy.address, "1 ether", {'from':bundler})
-    bundlerBalance = tokenErc20.balanceOf(bundler)
-
-    res = callBundler(safeTransactions)
+    candidePaymasterBalance = tokenErc20.balanceOf(candidePaymaster.address)
+    bundlerBalance = bundler.balance()
+    callBundler(safeTransactions)
 
     assert beforeBalance + 5 * N == receiver.balance() #verifing eth is sent
-    assert tokenErc20.balanceOf(bundler) > bundlerBalance #verify bundler is payed
+    assert tokenErc20.balanceOf(candidePaymaster.address) > candidePaymasterBalance #verify paymaster is payed
+    assert bundler.balance() > bundlerBalance   #verify bundler is payed
+
+def test_transfer_from_entrypoint_with_init(SafeProxy4337, safeProxy, gnosisSafeSingleton,
+    EIP4337Manager, SocialRecoveryModule, owner, bundler, entryPoint, SingletonFactory,
+    Contract, receiver, accounts):
+    """
+    Call entrypoint with initdata to create a safeproxy then send eth
+    """
+    beforeBalance = receiver.balance()
+
+    moduleManagerBytecode = EIP4337Manager.bytecode
+    moduleManagerArgsEncoded = eth_abi.encode_abi(
+            ['address'], [entryPoint.address]).hex()
+    moduleManagerInitCode = moduleManagerBytecode + moduleManagerArgsEncoded
+
+    random.seed(owner.address)
+    salt = random.randrange(1,10**32) #create a random salt for contract factory
+    #calculate EIP4337Manager address using getSenderAddress
+    moduleManagerAddress = entryPoint.getSenderAddress(moduleManagerInitCode, salt)
+
+    #initCode for deploying a new SafeProxy contract by the entrypoint
+    walletProxyBytecode = SafeProxy4337.bytecode
+    walletProxyArgsEncoded = eth_abi.encode_abi(
+            ['address', 'address', 'address'],
+            [gnosisSafeSingleton.address, moduleManagerAddress,
+                owner.address]).hex()
+    initCode = walletProxyBytecode + walletProxyArgsEncoded
+    
+    #send eth to the SafeProxy Contract address before deploying the SafeProxy contract
+    proxyAdd = entryPoint.getSenderAddress(initCode, 0)
+    accounts[0].transfer(proxyAdd, "1 ether")
+    
+    #create callData to be executed by the SafeProxy contract
+    callData = safeProxy.execTransactionFromModule.encode_input(
+        receiver.address,
+        1000000000000000000,
+        "0x",
+        0)
+
+    #deposit eth for the proxy contract in the entrypoint (no paymaster) 
+    entryPoint.depositTo(proxyAdd, 
+            {'from':accounts[3], 'value': ".05 ether"})
+
+    #create entrypoint operation
+    op = [
+            proxyAdd,
+            0,
+            initCode,
+            callData,
+            2150000,
+            645000,
+            21000,
+            17530000000,
+            17530000000,
+            '0x0000000000000000000000000000000000000000',
+            bytes(0),
+            bytes(0)
+            ]
+
+    requestId = entryPoint.getRequestId(op)
+       
+    ownerSigner = w3.eth.account.from_key(owner.private_key)
+    message_hash = defunct_hash_message(requestId)
+    sig = ownerSigner.signHash(message_hash)
+    op[11] = sig.signature.hex()
+
+    #add the random salt, used to deploy the moduleManager by the bundler RPC
+    op.append(salt) 
+
+    res = callBundler([op])
+    
+    assert beforeBalance + 1000000000000000000 == receiver.balance()
+
+    socialRecoveryBytecode = SocialRecoveryModule.bytecode
+    socialRecoveryInitCode = socialRecoveryBytecode #+ socialRecoveryArgsEncoded
+
+    random.seed(owner.address)
+    salt = random.randrange(1,10**32) #create a random salt for contract factory
+    #calculate EIP4337Manager address using getSenderAddress
+    socialRecoveryAddress = entryPoint.getSenderAddress(socialRecoveryInitCode, salt)
+    
+
+    #create callData to be executed by the SafeProxy contract
+    callData = SingletonFactory.deploy.encode_input(
+        '0x' + socialRecoveryInitCode,
+        "0x{:064x}".format(salt)
+        )
+    
+    #deposit eth for the proxy contract in the entrypoint (no paymaster) 
+    entryPoint.depositTo(proxyAdd, 
+            {'from':accounts[3], 'value': ".5 ether"})
+
+    accounts[5].transfer(proxyAdd, "1 ether")
+
+    deployedProxy =  Contract.from_abi("SafeProxy", proxyAdd, safeProxy.abi)
+
+
+    safeCallData = deployedProxy.execTransactionFromModule.encode_input(
+        SingletonFactory.address,
+        0,
+        callData,
+        0)
+
+    op = [
+            proxyAdd,
+            0,
+            bytes(0),
+            safeCallData,
+            2150000,
+            645000,
+            21000,
+            17530000000,
+            17530000000,
+            "0x0000000000000000000000000000000000000000",
+            bytes(0),
+            bytes(0)
+            ]
+    requestId = entryPoint.getRequestId(op)
+    ownerSigner = w3.eth.account.from_key(owner.private_key)
+    message_hash = defunct_hash_message(requestId)
+    sig = ownerSigner.signHash(message_hash)
+    op[11] = sig.signature
+    op.append(0)
+
+    res = callBundler([op])
 
 def callBundler(ops):
+    """
+    Calls the Bundle JSON RPC
+    """
     opDict = {"request":[{
         "sender": op[0],
         "nonce":op[1],
@@ -124,7 +266,8 @@ def callBundler(ops):
         "maxPriorityFeePerGas": op[8],
         "paymaster": op[9],
         "paymasterData": op[10],
-        "signature":op[11]
+        "signature":op[11],
+        "moduleManagerSalt":op[12]
         } for op in ops]}
 
     dictt = {
@@ -134,10 +277,13 @@ def callBundler(ops):
         "id": 1
     }
 
-    x = requests.post("http://127.0.0.1:8000/jsonrpc/", data=json.dumps(dictt, cls=BytesEncoder))
+    x = requests.post(os.environ['BundlerRPC'] + "jsonrpc/bundler", data=json.dumps(dictt, cls=BytesEncoder))
     return x
 
 def callPaymaster(op):
+    """
+    Calls the Paymaster JSON RPC
+    """
     opDict = {"request":{
         "sender": op[0],
         "nonce":op[1],
@@ -160,11 +306,16 @@ def callPaymaster(op):
         "id": 1
     }
 
-    x = requests.post("http://127.0.0.1:8000/jsonrpc/", data=json.dumps(dictt, cls=BytesEncoder))
+    result = requests.post(os.environ['BundlerRPC'] + 
+        "jsonrpc/paymaster", data=json.dumps(dictt, cls=BytesEncoder))
 
-    return json.loads(x.text)['result']
+    return json.loads(result.text)['result']
 
 def getRequestId(op):
+    """
+    Get an operation requestId
+    Note: the wallet client can compute the request id internally (recommended)
+    """
     opDict = {"request":{
         "sender": op[0],
         "nonce":op[1],
@@ -177,7 +328,7 @@ def getRequestId(op):
         "maxPriorityFeePerGas": op[8],
         "paymaster": op[9],
         "paymasterData": op[10],
-        "signature":op[11]
+        "signature":op[11],
         }}
 
     dictt = {
@@ -187,9 +338,10 @@ def getRequestId(op):
         "id": 1
     }
 
-    x = requests.post("http://127.0.0.1:8000/jsonrpc/", data=json.dumps(dictt, cls=BytesEncoder))
+    result = requests.post(os.environ['BundlerRPC'] + 
+        "jsonrpc/bundler", data=json.dumps(dictt, cls=BytesEncoder))
 
-    return '0x' + json.loads(x.text)['result']
+    return '0x' + json.loads(result.text)['result']
 
 
 class BytesEncoder(json.JSONEncoder):
