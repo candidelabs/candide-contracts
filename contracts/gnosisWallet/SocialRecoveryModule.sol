@@ -90,9 +90,12 @@ contract SocialRecoveryModule is Module {
     {
         bytes memory data = abi.encodeWithSignature("swapOwner(address,address,address)", prevOwner, oldOwner, newOwner);
         bytes32 dataHash = getDataHash(data);
+        dataHash = dataHash.toEthSignedMessageHash();
+
         require(!isExecuted[dataHash], "Recovery already executed");
         require(signatures.length <= friends.length && signatures.length >= threshold, 
             "Wrong number of signatures");
+        
         for (uint256 i = 0; i < signatures.length; i++) {
             address recoveredFriend = dataHash.recover(signatures[i]);
             require(isFriend[recoveredFriend] && !isConfirmed[dataHash][recoveredFriend],

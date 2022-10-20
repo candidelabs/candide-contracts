@@ -4,7 +4,7 @@ import pytest
 from brownie import Contract, SafeProxy4337, reverts 
 from web3.auto import w3
 from eth_account.messages import defunct_hash_message
-from eth_account import Account
+from eth_account import Account, messages
 from hexbytes import HexBytes
 import eth_abi
 from  testUtils import *
@@ -262,7 +262,6 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
     contract_transaction_hash = HexBytes(tx_hash)
     ownerSigner = Account.from_key(owner.private_key)
     signature = ownerSigner.signHash(contract_transaction_hash)
-
     safeProxy.execTransaction(
         safeProxy.address,
         0,
@@ -355,14 +354,14 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
         socialRecoveryModule.recoverAccess(prevOwner, owner.address,
             newOwner.address, {'from': friends[0]})
     
-    friend0Signer = w3.eth.account.from_key(friends[0].private_key)
-    sigFriend0 = friend0Signer.signHash(dataHash)
+    message = messages.encode_defunct(dataHash)
+    sigFriend0 = Account.sign_message(message, friends[0].private_key)
 
-    friend1Signer = w3.eth.account.from_key(friends[1].private_key)
-    sigFriend1 = friend1Signer.signHash(dataHash)
+    message = messages.encode_defunct(dataHash)
+    sigFriend1 = Account.sign_message(message, friends[1].private_key)
 
-    notOwnerSigner = w3.eth.account.from_key(notOwner.private_key)
-    sigNotOwner = notOwnerSigner.signHash(dataHash)
+    message = messages.encode_defunct(dataHash)
+    sigNotOwner = Account.sign_message(message, notOwner.private_key)
 
     #will revert if wrong signatures
     with reverts():
