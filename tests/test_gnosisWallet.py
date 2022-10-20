@@ -455,12 +455,19 @@ def test_transfer_from_entrypoint_with_candidePaymaster(safeProxy, tokenErc20,
         bytes(0),
         bytes(0)
         ]
+    maxTokenCost = 5
+    maxTokenCostHex = str("{0:0{1}x}".format(maxTokenCost,40))
+    
+    costOfPost = 10**18
+    costOfPostHex = str("{0:0{1}x}".format(costOfPost,40))
 
-    datahash = candidePaymaster.getHash(op)
+    token = tokenErc20.address[2:]
+
+    datahash = candidePaymaster.getHash(op, maxTokenCost, costOfPost, tokenErc20.address)
     bundlerSigner = w3.eth.account.from_key(bundler.private_key)
     sig = bundlerSigner.signHash(datahash)
         
-    paymasterData = str("{0:0{1}x}".format(5,40)) + str("{0:0{1}x}".format(10**18,40)) + tokenErc20.address[2:] + sig.signature.hex()[2:]
+    paymasterData = maxTokenCostHex + costOfPostHex + token + sig.signature.hex()[2:]
 
     op[10] = paymasterData
 
@@ -496,12 +503,12 @@ def test_transfer_from_entrypoint_with_candidePaymaster(safeProxy, tokenErc20,
             '0x'
             ]
 
-    
-    datahash = candidePaymaster.getHash(op)
+
+    datahash = candidePaymaster.getHash(op, maxTokenCost, costOfPost, tokenErc20.address)
     bundlerSigner = w3.eth.account.from_key(bundler.private_key)
     sig = bundlerSigner.signHash(datahash)
 
-    paymasterData = str("{0:0{1}x}".format(5,40)) + str("{0:0{1}x}".format(10**18,40)) + tokenErc20.address[2:] + sig.signature.hex()[2:]
+    paymasterData = maxTokenCostHex + costOfPostHex + token + sig.signature.hex()[2:]
 
     op = [
             safeProxy.address,

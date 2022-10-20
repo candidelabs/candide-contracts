@@ -51,7 +51,8 @@ contract CandidePaymaster is BasePaymaster {
      * note that this signature covers all fields of the UserOperation, except the "paymasterData",
      * which will carry the signature itself.
      */
-    function getHash(UserOperation calldata userOp)
+    function getHash(UserOperation calldata userOp, uint160 maxTokenCost,
+        uint160 costOfPost, address token)
     public pure returns (bytes32) {
         //can't use userOp.hash(), since it contains also the paymasterData itself.
         return keccak256(abi.encode(
@@ -64,7 +65,10 @@ contract CandidePaymaster is BasePaymaster {
                 userOp.preVerificationGas,
                 userOp.maxFeePerGas,
                 userOp.maxPriorityFeePerGas,
-                userOp.paymaster
+                userOp.paymaster,
+                maxTokenCost,
+                costOfPost,
+                token
             ));
     }
 
@@ -81,7 +85,6 @@ contract CandidePaymaster is BasePaymaster {
     external view override returns (bytes memory context) {
         (requestId);
 
-        bytes32 hash = getHash(userOp);
         uint256 paymasterDataLength = userOp.paymasterData.length;
 
         require(paymasterDataLength == 124 || paymasterDataLength == 125, 
@@ -92,6 +95,7 @@ contract CandidePaymaster is BasePaymaster {
         IERC20 token = IERC20(address(bytes20(userOp.paymasterData[40:60])));
         address account = userOp.getSender();
 
+        bytes32 hash = getHash(userOp, maxTokenCost, costOfPost, address(token));
         require(verifyingSigner == hash.recover(userOp.paymasterData[60:]), 
             "CandidePaymaster: wrong signature");
 
