@@ -59,10 +59,18 @@ brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
 ```
 brownie compile
 ```
+
+## Call trace for an Entrypoint call
+<img src="https://github.com/candidelabs/CandideWalletContracts/blob/main/docs/call_trace.png"/>
+
+## Contracts and bundler diagram
+<img src="https://github.com/candidelabs/CandideWalletContracts/blob/main/docs/diagram.png"/>
+
 ## Run all tests
 ```
 brownie test --network goerli-fork-dev
 ```
+test_bundler.py will only pass if the <a href='https://github.com/candidelabs/Candide-bundler-and-paymaster-RPC'>bundler RPC</a> is running 
 
 ## TODO
 - [ ] BLS signatures and aggregation
