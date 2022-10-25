@@ -169,4 +169,9 @@ contract SocialRecoveryModule is Module {
         //update threshold
         threshold = _threshold;
     }
+
+    /// return friends array
+    function getFriends() public view returns (address[] memory) {
+        return friends;
+    }
 }
