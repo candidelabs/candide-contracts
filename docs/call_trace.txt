@@ -1,4 +1,4 @@
-An example of an entrypoint call with two operations (approve + transfer) using a paymaster                
+An example of an entrypoint call with two operations (approve + send eth) using a paymaster                
 
 EntryPoint.handleOps  0:23313  [44157 / 310595 gas]
 ├── SafeProxy4337  [CALL]  1636:4705  [1853 / 59917 gas]
