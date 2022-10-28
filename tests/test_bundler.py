@@ -20,7 +20,9 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
     #to use the paymaster, every bundle should start with and approve operation that
     # cover the cost for the hall bundle 
     tokenErc20.transfer(safeProxy.address, "2 ether", {'from':bundler})
-    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, 10**8)
+    # approveAmount = (costOfPost + (callGas + verificationGas * 3 + preVerificationGas)*maxFeePerGas) per operation
+    approveAmount = N * (10**10 + (2150000 + 645000 * 3 + 21000) * 1000000)
+    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, approveAmount)
     callData = safeProxy.execTransactionFromModule.encode_input(
             tokenErc20.address,
             0,
@@ -40,6 +42,19 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
         bytes(0),
         bytes(0)
         ]
+
+        #  address sender;
+        # uint256 nonce;
+        # bytes initCode;
+        # bytes callData;
+        # uint256 callGas;
+        # uint256 verificationGas;
+        # uint256 preVerificationGas;
+        # uint256 maxFeePerGas;
+        # uint256 maxPriorityFeePerGas;
+        # address paymaster;
+        # bytes paymasterData;
+        # bytes signature;
         
     paymasterData = callPaymaster([op])
 
