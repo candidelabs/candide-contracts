@@ -41,16 +41,16 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
         bytes(0)
         ]
         
-    paymasterData = callPaymaster(op)
+    paymasterData = callPaymaster([op])
 
-    op[10] = paymasterData
+    op[10] = paymasterData[0]
 
     requestId = entryPoint.getRequestId(op)
     
     ownerSigner = w3.eth.account.from_key(owner.private_key)
     message_hash = defunct_hash_message(requestId)
     sig = ownerSigner.signHash(message_hash)
-    op[11] = sig.signature
+    op[11] = sig.signature.hex()
 
     op.append(0)    #set the random salt to zero if there is no initCode
     ops.append(op)  #add op to the bundle
@@ -77,21 +77,22 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
             bytes(0),
             bytes(0)
         ]
+        ops.append(op)
         
-        paymasterData = callPaymaster(op)
-
-        op[10] = paymasterData
+    paymasterDataList = callPaymaster(ops[1:])
+    index = 0
+    for op in ops[1:]:
+        op[10] = paymasterDataList[index]
+        index = index + 1
 
         requestId = entryPoint.getRequestId(op)
-       
+        
         ownerSigner = w3.eth.account.from_key(owner.private_key)
         message_hash = defunct_hash_message(requestId)
         sig = ownerSigner.signHash(message_hash)
-        op[11] = sig.signature
+        op[11] = sig.signature.hex()
 
         op.append(0) #set the random salt to zero if there is no initCode
-        
-        ops.append(op)  #add op to the bundle
 
     return ops
 
@@ -137,7 +138,7 @@ def test_transfer_from_entrypoint_with_init(SafeProxy4337, safeProxy, gnosisSafe
     moduleManagerBytecode = EIP4337Manager.bytecode
     moduleManagerArgsEncoded = eth_abi.encode_abi(
             ['address'], [entryPoint.address]).hex()
-    moduleManagerInitCode = moduleManagerBytecode + moduleManagerArgsEncoded
+    moduleManagerInitCode = '0x' + moduleManagerBytecode + moduleManagerArgsEncoded
 
     random.seed(owner.address)
     salt = random.randrange(1,10**32) #create a random salt for contract factory
@@ -191,7 +192,7 @@ def test_transfer_from_entrypoint_with_init(SafeProxy4337, safeProxy, gnosisSafe
     op[11] = sig.signature.hex()
 
     #add the random salt, used to deploy the moduleManager by the bundler RPC
-    op.append(salt) 
+    op.append("0x{:064x}".format(salt)) 
 
     res = callBundler([op])
     
@@ -280,11 +281,11 @@ def callBundler(ops):
     x = requests.post(os.environ['BundlerRPC'] + "jsonrpc/bundler", data=json.dumps(dictt, cls=BytesEncoder))
     return x
 
-def callPaymaster(op):
+def callPaymaster(ops):
     """
     Calls the Paymaster JSON RPC
     """
-    opDict = {"request":{
+    opDict = {"request":[{
         "sender": op[0],
         "nonce":op[1],
         "initCode": op[2],
@@ -297,7 +298,8 @@ def callPaymaster(op):
         "paymaster": op[9],
         "paymasterData": bytes(0),
         "signature":bytes(0)
-        }}
+        } for op in ops],
+        "token": "0x03F1B4380995Fbf41652F75a38c9F74aD8aD73F5"}
 
     dictt = {
         "jsonrpc": "2.0", 
