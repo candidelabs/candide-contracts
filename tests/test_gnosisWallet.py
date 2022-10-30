@@ -191,7 +191,7 @@ def test_transaction_through_entrypoint(safeProxy, owner, bundler, receiver,
 
 def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialRecoveryModule,
         gnosisSafeSingleton, owner, bundler, receiver, notOwner,
-        entryPoint, accounts, SocialRecoveryModule, friends):
+        entryPoint, accounts, friends):
     """
     Call entrypoint with initdata to create a safeproxy then send eth
     """
@@ -207,7 +207,7 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
     
     #send eth to the SafeProxy Contract address before deploying the SafeProxy contract
     proxyAdd = entryPoint.getSenderAddress(initCode, 0)
-    accounts[0].transfer(proxyAdd, "1 ether")
+    accounts[0].transfer(proxyAdd, "1.05 ether")
     
     #create callData to be executed by the SafeProxy contract
     callData = safeProxy.execTransactionFromModule.encode_input(
@@ -215,10 +215,6 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
         1000000000000000000,
         "0x",
         0)
-
-    #deposit eth for the proxy contract in the entrypoint (no paymaster) 
-    entryPoint.depositTo(proxyAdd, 
-            {'from':accounts[3], 'value': ".05 ether"})
 
     #create entrypoint operation
     op = [
@@ -566,3 +562,96 @@ def test_validate_module_manager(moduleManager, safeProxy, entryPoint, owner, ac
     op[11] = sig.signature
 
     entryPoint.handleOps([op], owner, {'from': owner})
+
+def test_fees(safeProxy, owner, bundler, receiver,
+        entryPoint, accounts):
+    """
+    Test fees
+    """
+    accounts[0].transfer(safeProxy, "1 ether")#Add ether to wallet
+
+    receiverBeforeBalance = receiver.balance()
+    walletBeforeBalance = safeProxy.balance()
+    walletEntryPointBeforeDeposit = entryPoint.deposits(safeProxy.address)[0]
+    bundlerBeforeBalance = bundler.balance()
+    
+    assert walletEntryPointBeforeDeposit == 0
+
+    nonce = 0
+    amountToSend = 5
+
+    #using execTransactionFromModule
+    callData = safeProxy.execTransactionFromModule.encode_input(
+        receiver.address,
+        amountToSend,
+        "0x",
+        0)
+
+    op = [
+            safeProxy.address,
+            nonce,
+            bytes(0),
+            callData,
+            215000,
+            645000,
+            21000,
+            1000000,
+            1000000,
+            '0x0000000000000000000000000000000000000000',
+            '0x',
+            '0x'
+            ]
+    
+    nonce = nonce + 1
+    tx = ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
+
+    feesPaidByWallet = walletBeforeBalance - (safeProxy.balance() + amountToSend)
+    feesReceivedByBundler = bundler.balance() - bundlerBeforeBalance #equal to actualGasCost
+    walletEntryPointAfterDeposit = entryPoint.deposits(safeProxy.address)[0]
+
+    operationGas = 215000 + 645000 + 21000 #userOp.callGas + userOp.verificationGas  + userOp.preVerificationGas
+    gasPrice = 1000000 #maxFeePerGas in the test chain
+
+    assert receiverBeforeBalance + amountToSend == receiver.balance()
+    assert feesPaidByWallet == operationGas * gasPrice
+    assert feesReceivedByBundler < tx.gas_used * gasPrice #not profitable
+    assert walletEntryPointAfterDeposit > 0
+    assert feesPaidByWallet == feesReceivedByBundler + walletEntryPointAfterDeposit #walletEntryPointBeforeDeposit is 0
+
+    """
+    second operation
+    """
+    receiverBeforeBalance = receiver.balance()
+    walletBeforeBalance = safeProxy.balance()
+    walletEntryPointBeforeDeposit = entryPoint.deposits(safeProxy.address)[0]
+    bundlerBeforeBalance = bundler.balance()
+
+    op = [
+            safeProxy.address,
+            nonce,
+            bytes(0),
+            callData,
+            215000,
+            645000,
+            210000, #increase preVerificationGas for the bundler to be profitable
+            1000000,
+            1000000,
+            '0x0000000000000000000000000000000000000000',
+            '0x',
+            '0x'
+            ]
+
+    nonce = nonce + 1
+    ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
+    feesPaidByWallet = walletBeforeBalance - (safeProxy.balance() + amountToSend)
+    feesReceivedByBundler = bundler.balance() - bundlerBeforeBalance #equal to actualGasCost
+    walletEntryPointAfterDeposit = entryPoint.deposits(safeProxy.address)[0]
+
+    operationGas = 215000 + 645000 + 210000 #userOp.callGas + userOp.verificationGas  + userOp.preVerificationGas
+    gasPrice = 1000000 #maxFeePerGas in the test chain
+
+    assert receiverBeforeBalance + amountToSend == receiver.balance()
+    assert feesPaidByWallet == (operationGas * gasPrice) - walletEntryPointBeforeDeposit
+    assert feesReceivedByBundler > tx.gas_used * gasPrice #profitable
+    assert walletEntryPointAfterDeposit > 0
+    assert feesPaidByWallet == feesReceivedByBundler + (walletEntryPointAfterDeposit - walletEntryPointBeforeDeposit)
