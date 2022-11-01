@@ -20,9 +20,10 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
     #to use the paymaster, every bundle should start with and approve operation that
     # cover the cost for the hall bundle 
     tokenErc20.transfer(safeProxy.address, "2 ether", {'from':bundler})
-    # approveAmount = (costOfPost + (callGas + verificationGas * 3 + preVerificationGas)*maxFeePerGas) per operation
-    approveAmount = N * (10**10 + (2150000 + 645000 * 3 + 21000) * 1000000)
-    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, approveAmount)
+   
+
+    dummyApproveAmount = 1
+    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, dummyApproveAmount)
     callData = safeProxy.execTransactionFromModule.encode_input(
             tokenErc20.address,
             0,
@@ -43,31 +44,6 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
         bytes(0)
         ]
 
-        #  address sender;
-        # uint256 nonce;
-        # bytes initCode;
-        # bytes callData;
-        # uint256 callGas;
-        # uint256 verificationGas;
-        # uint256 preVerificationGas;
-        # uint256 maxFeePerGas;
-        # uint256 maxPriorityFeePerGas;
-        # address paymaster;
-        # bytes paymasterData;
-        # bytes signature;
-        
-    paymasterData = callPaymaster([op])
-
-    op[10] = paymasterData[0]
-
-    requestId = entryPoint.getRequestId(op)
-    
-    ownerSigner = w3.eth.account.from_key(owner.private_key)
-    message_hash = defunct_hash_message(requestId)
-    sig = ownerSigner.signHash(message_hash)
-    op[11] = sig.signature.hex()
-
-    op.append(0)    #set the random salt to zero if there is no initCode
     ops.append(op)  #add op to the bundle
 
     for i in range(N):       
@@ -107,7 +83,34 @@ def get_test_safeTransactions(N, safeProxy, tokenErc20, candidePaymaster,
         sig = ownerSigner.signHash(message_hash)
         op[11] = sig.signature.hex()
 
-        op.append(0) #set the random salt to zero if there is no initCode
+        op.append("") #set the random salt to "" if there is no initCode
+
+    approveAmount = call_getApproveAmount(ops)
+
+    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, approveAmount)
+    callData = safeProxy.execTransactionFromModule.encode_input(
+            tokenErc20.address,
+            0,
+            approveCallData,
+            0)
+
+    op = ops[0]
+    op[3] = callData
+
+    paymasterData = callPaymaster([op])
+
+    op[10] = paymasterData[0]
+
+    requestId = entryPoint.getRequestId(op)
+    
+    ownerSigner = w3.eth.account.from_key(owner.private_key)
+    message_hash = defunct_hash_message(requestId)
+    sig = ownerSigner.signHash(message_hash)
+    op[11] = sig.signature.hex()
+
+    op.append("")    #set the random salt to "" if there is no initCode
+
+    ops[0] = op
 
     return ops
 
@@ -262,7 +265,7 @@ def test_transfer_from_entrypoint_with_init(SafeProxy4337, safeProxy, gnosisSafe
     message_hash = defunct_hash_message(requestId)
     sig = ownerSigner.signHash(message_hash)
     op[11] = sig.signature
-    op.append(0)
+    op.append("")
 
     res = callBundler([op])
 
@@ -327,6 +330,30 @@ def callPaymaster(ops):
         "jsonrpc/paymaster", data=json.dumps(dictt, cls=BytesEncoder))
 
     return json.loads(result.text)['result']
+
+def call_getApproveAmount(ops):
+    """
+    Calls the Paymaster JSON RPC
+    """
+    opDict = {"request":[{
+        "callGas": op[4],
+        "verificationGas": op[5],
+        "preVerificationGas": op[6],
+        "maxFeePerGas": op[7],
+        } for op in ops],
+        "token": "0x03F1B4380995Fbf41652F75a38c9F74aD8aD73F5"}
+
+    dictt = {
+        "jsonrpc": "2.0", 
+        "method": "eth_getApproveAmount", 
+        "params": opDict, 
+        "id": 1
+    }
+
+    result = requests.post(os.environ['BundlerRPC'] + 
+        "jsonrpc/paymaster", data=json.dumps(dictt, cls=BytesEncoder))
+
+    return int(json.loads(result.text)['result'])
 
 def getRequestId(op):
     """
