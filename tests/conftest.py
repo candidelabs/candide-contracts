@@ -1,14 +1,16 @@
 #!/user/bin/python3
 
 import pytest
-from brownie import Contract, EIP4337Manager, SafeProxy4337, CandidePaymaster, DepositPaymaster, SocialRecoveryModule
+from brownie import Contract, CandideWallet, CandideWalletProxy, SocialRecoveryModule, DepositPaymaster, CompatibilityFallbackHandler
 from brownie_tokens import ERC20
 from eth_account import Account
+from hexbytes import HexBytes
+import json
 
-entryPoint_addr = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69" #Goerli
-gnosis_safe_singleton_addr = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E" #Goerli - V1.3.0
-bundler_pk="e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4" #should be the same as the bundler's RPC
+entryPoint_addr = '0xbdb76d21d9C1db55F0a37C9D26fe8C4aCD7e4D5e' #Goerli
+#entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
 SingletonFactory_add='0xce0042B868300000d44A59004Da54A005ffdcf9f'
+bundler_pk="e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4" #should be the same as the bundler's RPC
 
 @pytest.fixture(scope="function", autouse=True)
 def isolate(fn_isolation):
@@ -63,21 +65,23 @@ def entryPoint(Contract):
     """
     Fetch EntryPoint Contract from the specified address
     """
-    return Contract.from_explorer(entryPoint_addr)
+    f = open('tests/EntryPoint.json')
+    data = json.load(f)
+    return Contract.from_abi("EntryPoint", entryPoint_addr, data["abi"])
 
 @pytest.fixture(scope="module")
-def SingletonFactory(Contract):
+def singletonFactory(Contract):
     """
     Fetch EntryPoint Contract from the specified address
     """
     return Contract.from_explorer(SingletonFactory_add)
 
 @pytest.fixture(scope="module")
-def moduleManager(EIP4337Manager, entryPoint, owner):
+def simpleWallet(SimpleWallet, entryPoint, owner):
     """
-    Deploy EIP4337Manager contract
-    """
-    return EIP4337Manager.deploy(entryPoint.address, {'from': owner})
+    Deploy SimpleWallet contract
+    """ 
+    return SimpleWallet.deploy(entryPoint.address, owner.address, {"from":owner})
 
 @pytest.fixture(scope="module")
 def socialRecoveryModule(SocialRecoveryModule, owner):
@@ -87,28 +91,42 @@ def socialRecoveryModule(SocialRecoveryModule, owner):
     return SocialRecoveryModule.deploy({'from': owner})
 
 @pytest.fixture(scope="module")
-def gnosisSafeSingleton():
+def candideWalletSingleton(owner):
     """
     Fetch GnosisSafe Singleton Contract from the specified address
     """
-    return Contract.from_explorer(gnosis_safe_singleton_addr)
+    return CandideWallet.deploy({"from":owner})
 
 @pytest.fixture(scope="module")
-def safeProxy(SafeProxy4337, moduleManager, owner, gnosisSafeSingleton, friends):
+def compatibilityFallbackHandler(CompatibilityFallbackHandler, owner):
+    """
+    Deploy CandidePaymaster contract
+    """ 
+    return CompatibilityFallbackHandler.deploy({'from': owner})
+
+@pytest.fixture(scope="module")
+def candideWalletProxy(candideWalletSingleton, compatibilityFallbackHandler, 
+    entryPoint, owner):
     """
     Deploy a proxy contract for GnosisSafe
     """ 
-    sp = SafeProxy4337.deploy(gnosisSafeSingleton.address, moduleManager.address, 
-            owner.address, {'from': owner})
+    sp = CandideWalletProxy.deploy(candideWalletSingleton.address,{'from': owner})
     #returning a proxy instance with the target abi to facilitate diligate call
-    return Contract.from_abi("GnosisSafe", sp.address, gnosisSafeSingleton.abi)
+    candideWallet =  Contract.from_abi("CandideWallet", sp.address, candideWalletSingleton.abi)
+    
+    candideWallet.setupWithEntrypoint(
+        [owner.address],  
+        1, 
+        '0x0000000000000000000000000000000000000000', 
+        0, 
+        compatibilityFallbackHandler.address, 
+        '0x0000000000000000000000000000000000000000', 
+        0, 
+        '0x0000000000000000000000000000000000000000',
+        entryPoint.address, 
+        {"from":owner})
 
-@pytest.fixture(scope="module")
-def simpleWallet(SimpleWallet, entryPoint, owner):
-    """
-    Deploy SimpleWallet contract
-    """ 
-    return SimpleWallet.deploy(entryPoint.address, owner.address, {"from":owner})
+    return candideWallet
 
 @pytest.fixture(scope="module")
 def candidePaymaster(CandidePaymaster, entryPoint, bundler):

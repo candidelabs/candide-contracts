@@ -15,30 +15,27 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
   */
 contract SimpleWallet is BaseWallet {
     using ECDSA for bytes32;
-    using UserOperationLib for UserOperation;
 
     //explicit sizes of nonce, to fit a single storage cell with "owner"
     uint96 private _nonce;
     address public owner;
 
-    event Test(bytes32 requestId, bytes32 hash, address owner, bytes signature);
-    event own(address owner);
     function nonce() public view virtual override returns (uint256) {
         return _nonce;
     }
 
-    function entryPoint() public view virtual override returns (EntryPoint) {
+    function entryPoint() public view virtual override returns (IEntryPoint) {
         return _entryPoint;
     }
 
-    EntryPoint private _entryPoint;
+    IEntryPoint private _entryPoint;
 
     event EntryPointChanged(address indexed oldEntryPoint, address indexed newEntryPoint);
 
     // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 
-    constructor(EntryPoint anEntryPoint, address anOwner) {
+    constructor(IEntryPoint anEntryPoint, address anOwner) {
         _entryPoint = anEntryPoint;
         owner = anOwner;
     }
@@ -56,9 +53,7 @@ contract SimpleWallet is BaseWallet {
     /**
      * transfer eth value to a destination address
      */
-    function transfer(address payable dest, uint256 amount) external onlyOwner{
-        emit own(msg.sender);
-        emit own(address(this));
+    function transfer(address payable dest, uint256 amount) external onlyOwner {
         dest.transfer(amount);
     }
 
@@ -86,7 +81,7 @@ contract SimpleWallet is BaseWallet {
      */
     function _updateEntryPoint(address newEntryPoint) internal override {
         emit EntryPointChanged(address(_entryPoint), newEntryPoint);
-        _entryPoint = EntryPoint(payable(newEntryPoint));
+        _entryPoint = IEntryPoint(payable(newEntryPoint));
     }
 
     function _requireFromAdmin() internal view override {
@@ -117,17 +112,18 @@ contract SimpleWallet is BaseWallet {
     }
 
     /// implement template method of BaseWallet
-    function _validateSignature(UserOperation calldata userOp, bytes32 requestId) internal override {
+    function _validateSignature(UserOperation calldata userOp, bytes32 requestId, address)
+    internal override virtual returns (uint256 deadline) {
         bytes32 hash = requestId.toEthSignedMessageHash();
-        emit Test(requestId, hash, owner, userOp.signature);
         require(owner == hash.recover(userOp.signature), "wallet: wrong signature");
+        return 0;
     }
 
     function _call(address target, uint256 value, bytes memory data) internal {
         (bool success, bytes memory result) = target.call{value : value}(data);
         if (!success) {
             assembly {
-                revert(add(result,32), mload(result))
+                revert(add(result, 32), mload(result))
             }
         }
     }
@@ -153,7 +149,7 @@ contract SimpleWallet is BaseWallet {
      * @param withdrawAddress target to send to
      * @param amount to withdraw
      */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner{
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
         entryPoint().withdrawTo(withdrawAddress, amount);
     }
 }

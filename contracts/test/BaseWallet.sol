@@ -5,8 +5,7 @@ pragma solidity ^0.8.12;
 /// @author modified by CandideWallet Team
 
 import "../../interfaces/IWallet.sol";
-import "../../interfaces/EntryPoint.sol";
-
+import "../../interfaces/IEntryPoint.sol";
 /**
  * Basic wallet implementation.
  * this contract provides the basic logic for implementing the IWallet interface  - validateUserOp
@@ -25,17 +24,16 @@ abstract contract BaseWallet is IWallet {
      * return the entryPoint used by this wallet.
      * subclass should return the current entryPoint used by this wallet.
      */
-    function entryPoint() public view virtual returns (EntryPoint);
+    function entryPoint() public view virtual returns (IEntryPoint);
 
     /**
      * Validate user's signature and nonce.
-     * subclass doesn't override this method. instead, it should override the specific internal validation methods.
+     * subclass doesn't need to override this method. Instead, it should override the specific internal validation methods.
      */
-    function validateUserOp(UserOperation calldata userOp, bytes32 requestId, uint256 missingWalletFunds) external override {
+    function validateUserOp(UserOperation calldata userOp, bytes32 requestId, address aggregator, uint256 missingWalletFunds)
+    external override virtual returns (uint256 deadline) {
         _requireFromEntryPoint();
-        _validateSignature(userOp, requestId);
-        //during construction, the "nonce" field hold the salt.
-        // if we assert it is zero, then we allow only a single wallet per owner.
+        deadline = _validateSignature(userOp, requestId, aggregator);
         if (userOp.initCode.length == 0) {
             _validateAndUpdateNonce(userOp);
         }
@@ -54,8 +52,12 @@ abstract contract BaseWallet is IWallet {
      * @param userOp validate the userOp.signature field
      * @param requestId convenient field: the hash of the request, to check the signature against
      *          (also hashes the entrypoint and chain-id)
+     * @param aggregator the current aggregator. can be ignored by wallets that don't use aggregators
+     * @return deadline the last block timestamp this operation is valid, or zero if it is valid indefinitely.
+     *      Note that the validation code cannot use block.timestamp (or block.number) directly.
      */
-    function _validateSignature(UserOperation calldata userOp, bytes32 requestId) internal virtual;
+    function _validateSignature(UserOperation calldata userOp, bytes32 requestId, address aggregator)
+    internal virtual returns (uint256 deadline);
 
     /**
      * validate the current nonce matches the UserOperation nonce.
@@ -75,8 +77,6 @@ abstract contract BaseWallet is IWallet {
      */
     function _payPrefund(uint256 missingWalletFunds) internal virtual {
         if (missingWalletFunds != 0) {
-            //pay required prefund. make sure NOT to use the "gas" opcode, which is banned during validateUserOp
-            // (and used by default by the "call")
             (bool success,) = payable(msg.sender).call{value : missingWalletFunds, gas : type(uint256).max}("");
             (success);
             //ignore failure (its EntryPoint's job to verify, not wallet.)

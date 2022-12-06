@@ -4,7 +4,7 @@ pragma solidity ^0.8.12;
 /// @author CandideWallet Team
 
 import "./BasePaymaster.sol";
-import "../../interfaces/EntryPoint.sol";
+import "../../interfaces/IEntryPoint.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -28,7 +28,7 @@ contract CandidePaymaster is BasePaymaster {
     address public immutable verifyingSigner;
     mapping(IERC20 => uint256) public balances;
 
-    constructor(EntryPoint _entryPoint, address _verifyingSigner) BasePaymaster(_entryPoint) {
+    constructor(IEntryPoint _entryPoint, address _verifyingSigner) BasePaymaster(_entryPoint) {
         verifyingSigner = _verifyingSigner;
     }
 
@@ -60,18 +60,19 @@ contract CandidePaymaster is BasePaymaster {
                 userOp.nonce,
                 keccak256(userOp.initCode),
                 keccak256(userOp.callData),
-                userOp.callGas,
-                userOp.verificationGas,
+                userOp.callGasLimit,
+                userOp.verificationGasLimit,
                 userOp.preVerificationGas,
                 userOp.maxFeePerGas,
                 userOp.maxPriorityFeePerGas,
-                userOp.paymaster,
+                //userOp.paymasterAndData,
                 maxTokenCost,
                 costOfPost,
                 token
             ));
     }
 
+    event paymaster(uint160 maxTokenCost, uint160 costOfPost, IERC20 token, bytes sig);
     /**
      *verify our external signer signed this request and decode paymasterData
      *paymasterData contains the following:
@@ -81,30 +82,31 @@ contract CandidePaymaster is BasePaymaster {
      *signature length 64 or 65
      *total paymasterData length equal 124 or 125
      */
-    function validatePaymasterUserOp(UserOperation calldata userOp, bytes32 requestId, uint256 maxCost)
-    external view override returns (bytes memory context) {
-        (requestId);
 
-        uint256 paymasterDataLength = userOp.paymasterData.length;
+    function validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
+    external returns (bytes memory context, uint256 deadline){
+
+        uint256 paymasterDataLength = userOp.paymasterAndData.length - 20;
 
         require(paymasterDataLength == 124 || paymasterDataLength == 125, 
             "CandidePaymaster: invalid paymasterData length");
 
-        uint160 maxTokenCost = uint160(bytes20(userOp.paymasterData[:20]));
-        uint160 costOfPost = uint160(bytes20(userOp.paymasterData[20:40]));
-        IERC20 token = IERC20(address(bytes20(userOp.paymasterData[40:60])));
+        uint160 maxTokenCost = uint160(bytes20(userOp.paymasterAndData[20:40]));
+        uint160 costOfPost = uint160(bytes20(userOp.paymasterAndData[40:60]));
+        IERC20 token = IERC20(address(bytes20(userOp.paymasterAndData[60:80])));
         address account = userOp.getSender();
 
         bytes32 hash = getHash(userOp, maxTokenCost, costOfPost, address(token));
-        require(verifyingSigner == hash.recover(userOp.paymasterData[60:]), 
+        emit paymaster(maxTokenCost, costOfPost, token, bytes(userOp.paymasterAndData[80:]));
+        require(verifyingSigner == hash.recover(userOp.paymasterAndData[80:]), 
             "CandidePaymaster: wrong signature");
 
         //no need for other on-chain validation: entire UserOp should have been checked
         // by the external service prior to signing it.
-        return abi.encode(account, token, maxTokenCost, maxCost, costOfPost);
+        return (abi.encode(account, token, maxTokenCost, maxCost, costOfPost), 0);
     }
 
-
+    event tokenCost(uint256 cost);
     /**
      * perform the post-operation to charge the sender for the gas.
       */
@@ -117,6 +119,7 @@ contract CandidePaymaster is BasePaymaster {
         //if costOfPost is zero the transaction is sponsored
         if(costOfPost > 0){
             uint256 actualTokenCost = (actualGasCost + costOfPost) * maxTokenCost / maxCost;
+            emit tokenCost(actualTokenCost);
             token.safeTransferFrom(account, address(this), actualTokenCost);
             balances[token] += actualTokenCost;
         }

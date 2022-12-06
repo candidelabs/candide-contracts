@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import pytest
-from brownie import Contract, SafeProxy4337, reverts 
+from brownie import Contract, reverts, CandideWalletProxy
 from web3.auto import w3
 from eth_account.messages import defunct_hash_message
 from eth_account import Account, messages
@@ -9,31 +9,32 @@ from hexbytes import HexBytes
 import eth_abi
 from  testUtils import *
 
-def test_VERSION(safeProxy):
+
+def test_VERSION(candideWalletProxy):
     """
     Check version - older versions are not suppoted
     """
-    assert safeProxy.VERSION() == "1.3.0"
+    assert candideWalletProxy.VERSION() == "1.3.0"
 
-def test_owner(safeProxy, owner):
+def test_owner(candideWalletProxy, owner):
     """
     Check owner
     """
-    assert safeProxy.getOwners()[0] == owner
+    assert candideWalletProxy.getOwners()[0] == owner
 
 
-def test_transaction_from_proxy_directly(safeProxy, owner, 
+def test_transaction_from_proxy_directly(candideWalletProxy, owner, 
     notOwner, bundler, tokenErc20, receiver, accounts):
     """
-    Create a GnosisSafe transaction and call the proxy directly and check eth transfer
+    Create a  transaction and call the proxy directly and check eth transfer
     """
-    accounts[0].transfer(safeProxy, "1 ether") #Add ether to wallet
+    accounts[0].transfer(candideWalletProxy, "1 ether") #Add ether to wallet
     beforeBalance = receiver.balance()
-    nonce = 0
+    nonce = 1
 
     #should revert if not the owner
     with reverts():
-        ExecuteGnosisSafeExecTransaction(
+        ExecuteExecTransaction(
             receiver.address,
             5,  #value to send
             "0x",
@@ -43,13 +44,12 @@ def test_transaction_from_proxy_directly(safeProxy, owner,
             0,  
             '0x0000000000000000000000000000000000000000',
             '0x0000000000000000000000000000000000000000',
-            nonce,
             notOwner,
             notOwner,
-            safeProxy)
-   
+            candideWalletProxy)
+
     #should excute successfuly if from owner
-    ExecuteGnosisSafeExecTransaction(
+    ExecuteExecTransaction(
             receiver.address,
             5,  #value to send
             "0x",
@@ -59,14 +59,13 @@ def test_transaction_from_proxy_directly(safeProxy, owner,
             0,  
             '0x0000000000000000000000000000000000000000',
             '0x0000000000000000000000000000000000000000',
-            nonce,
             owner,
             owner,
-            safeProxy)
+            candideWalletProxy)
 
     #should revert if wrong nonce
     with reverts():
-        ExecuteGnosisSafeExecTransaction(
+        ExecuteExecTransaction(
             receiver.address,
             5,  #value to send
             "0x",
@@ -76,19 +75,18 @@ def test_transaction_from_proxy_directly(safeProxy, owner,
             0,  
             '0x0000000000000000000000000000000000000000',
             '0x0000000000000000000000000000000000000000',
-            nonce,
             notOwner,
             notOwner,
-            safeProxy)
+            candideWalletProxy)
 
     nonce = nonce + 1
     assert beforeBalance + 5 == receiver.balance()
 
     #should revert if value higher than balance
     with reverts():
-        ExecuteGnosisSafeExecTransaction(
+        ExecuteExecTransaction(
             receiver.address,
-            safeProxy.balance() + 1,
+            candideWalletProxy.balance() + 1,
             "0x",
             0,
             0,
@@ -96,20 +94,19 @@ def test_transaction_from_proxy_directly(safeProxy, owner,
             0,  
             '0x0000000000000000000000000000000000000000',
             '0x0000000000000000000000000000000000000000',
-            nonce,
             notOwner,
             notOwner,
-            safeProxy)
+            candideWalletProxy)
 
     #mint erc20 for safe wallet to pay for the transaction gas with erc20
     amount = 100_000 * 10 ** 18
-    tokenErc20._mint_for_testing(safeProxy.address, amount)
+    tokenErc20._mint_for_testing(candideWalletProxy.address, amount)
 
     beforeBundlerErc20Balance = tokenErc20.balanceOf(bundler)
     beforeBalance = receiver.balance()
 
     #pay with transaction with erc20 by using a bundler/relayer
-    ExecuteGnosisSafeExecTransaction(
+    ExecuteExecTransaction(
         receiver.address,
         5,  #value to send
         "0x",
@@ -119,39 +116,38 @@ def test_transaction_from_proxy_directly(safeProxy, owner,
         100000,
         tokenErc20.address,
         bundler.address,
-        nonce,
         owner,
         bundler,   # bundler/relayer that will sponsor the gas cost for erc20
-        safeProxy)
+        candideWalletProxy)
     
     #check if bundler was payed for relaying the transaction
     assert beforeBundlerErc20Balance < tokenErc20.balanceOf(bundler)
     assert beforeBalance + 5 == receiver.balance()
 
-
-
-def test_transaction_through_entrypoint(safeProxy, owner, bundler, receiver,
+def test_transaction_through_entrypoint(candideWalletProxy, owner, bundler, receiver,
         entryPoint, accounts):
     """
-    Create a GnosisSafe transaction through the EntryPoint
+    Create a  transaction through the EntryPoint
     """
-    accounts[0].transfer(safeProxy, "1 ether")#Add ether to wallet
+    accounts[0].transfer(candideWalletProxy, "1 ether")#Add ether to wallet
     beforeBalance = receiver.balance()
-    nonce = 0
+    nonce = 1
 
-    #using execTransactionFromModule
-    callData = safeProxy.execTransactionFromModule.encode_input(
+    callData = candideWalletProxy.execTransactionFromEntrypoint.encode_input(
         receiver.address,
         5,
         "0x",
+        0,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
         0)
     
-    entryPoint.depositTo(safeProxy.address, 
+    entryPoint.depositTo(candideWalletProxy.address, 
             {'from':accounts[3], 'value': "1 ether"})
 
     op = [
-            safeProxy.address,
-            0,
+            candideWalletProxy.address,
+            1,
             bytes(0),
             callData,
             215000,
@@ -159,62 +155,51 @@ def test_transaction_through_entrypoint(safeProxy, owner, bundler, receiver,
             21000,
             1000000,
             1000000,
-            '0x0000000000000000000000000000000000000000',
-            '0x',
+            bytes(0),
             '0x'
             ]
-    gasused1 = ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
+    ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
     assert beforeBalance + 5 == receiver.balance()
 
     beforeBalance = receiver.balance()
-    nonce = nonce + 1
 
-    #using execTransaction   
-    ExecuteEntryPointHandleOpsWithExecTransaction(
-        receiver.address,
-        5,  #value to send
-        "0x",
-        0,
-        215000,
-        215000,
-        100000,
-        "0x0000000000000000000000000000000000000000",
-        "0x0000000000000000000000000000000000000000",
-        nonce,
-        owner,
-        bundler,   # bundler/relayer that will sponsor the gas cost for erc20
-        safeProxy,
-        "0x0000000000000000000000000000000000000000",
-        bytes(0),
-        entryPoint)
-    assert beforeBalance + 5 == receiver.balance()
-
-def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialRecoveryModule,
-        gnosisSafeSingleton, owner, bundler, receiver, notOwner,
+def test_transfer_from_entrypoint_with_init(candideWalletProxy, socialRecoveryModule,
+        candideWalletSingleton, singletonFactory,  owner, bundler, receiver, notOwner,
         entryPoint, accounts, friends):
     """
-    Call entrypoint with initdata to create a safeproxy then send eth
+    Call entrypoint with initdata to create a candideWalletProxy then send eth
     """
     beforeBalance = receiver.balance()
 
-    #initCode for deploying a new SafeProxy contract by the entrypoint
-    walletProxyBytecode = SafeProxy4337.bytecode
-    walletProxyArgsEncoded = eth_abi.encode_abi(
-            ['address', 'address', 'address'],
-            [gnosisSafeSingleton.address, moduleManager.address,
-                owner.address]).hex()
-    initCode = walletProxyBytecode + walletProxyArgsEncoded
-    
-    #send eth to the SafeProxy Contract address before deploying the SafeProxy contract
-    proxyAdd = entryPoint.getSenderAddress(initCode, 0)
+    #initCode for deploying a new candideWalletProxy contract by the entrypoint
+    walletProxyBytecode = CandideWalletProxy.bytecode
+    walletProxyArgsEncoded = eth_abi.encode_abi(['address'],
+        [candideWalletSingleton.address]).hex()
+
+    #calculate proxy address 
+    ff = bytes.fromhex('ff')
+    proxyInit = walletProxyBytecode + walletProxyArgsEncoded
+    proxyInitHash = w3.soliditySha3(['bytes'],['0x' + proxyInit])
+    c2Nonce = 0
+    proxyAdd = w3.soliditySha3(['bytes1', 'address', 'uint256', 'bytes'], 
+        [ff, singletonFactory.address, c2Nonce, proxyInitHash])[-20:].hex()
+
+    #send eth to the candideWalletProxy Contract address before deploying the candideWalletProxy contract
     accounts[0].transfer(proxyAdd, "1.05 ether")
+
+    initCode =  singletonFactory.address[2:] + singletonFactory.deploy.encode_input(walletProxyBytecode+walletProxyArgsEncoded, 0)[2:]
+    #create callData to be executed by the candideWalletProxy contract
     
-    #create callData to be executed by the SafeProxy contract
-    callData = safeProxy.execTransactionFromModule.encode_input(
-        receiver.address,
-        1000000000000000000,
-        "0x",
-        0)
+    callData = candideWalletProxy.setupWithEntrypoint.encode_input(
+        [owner.address],
+        1,
+        '0x0000000000000000000000000000000000000000',
+        bytes(0),
+        '0x0000000000000000000000000000000000000000',
+        '0x0000000000000000000000000000000000000000',
+        0,
+        '0x0000000000000000000000000000000000000000',
+        entryPoint.address)
 
     #create entrypoint operation
     op = [
@@ -222,29 +207,54 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
             0,
             initCode,
             callData,
+            2150000,
+            6450000,
+            21000,
+            1000000,
+            1000000,
+            bytes(0),
+            bytes(0)
+            ]
+    
+    ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
+
+    candideWalletInit =  Contract.from_abi("CandideWallet", proxyAdd, candideWalletSingleton.abi)
+
+    callData = candideWalletInit.execTransactionFromEntrypoint.encode_input(
+        receiver.address,
+        5,
+        "0x",
+        0,
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        0)
+    
+    op = [
+            proxyAdd,
+            candideWalletInit.nonce(),
+            bytes(0),
+            callData,
             215000,
             645000,
             21000,
             1000000,
             1000000,
-            '0x0000000000000000000000000000000000000000',
-            '0x',
+            bytes(0),
             '0x'
             ]
     ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
-    
-    assert beforeBalance + 1000000000000000000 == receiver.balance()
+    assert beforeBalance + 5 == receiver.balance()
     
     """
     Test Social Recovry module - separate confirmations and recovery process
     """
     # add social recovery module contract to enabled modules
     friendsAddresses = [friends[0].address, friends[1].address]
-    callData = safeProxy.enableModule.encode_input(socialRecoveryModule.address)
-    nonce = safeProxy.nonce()
+    callData = candideWalletInit.enableModule.encode_input(socialRecoveryModule.address)
+    nonce = candideWalletInit.nonce()
 
-    tx_hash = safeProxy.getTransactionHash(
-        safeProxy.address,
+    tx_hash = candideWalletInit.getTransactionHash(
+        candideWalletInit.address,
         0,
         callData,
         0,
@@ -258,8 +268,8 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
     contract_transaction_hash = HexBytes(tx_hash)
     ownerSigner = Account.from_key(owner.private_key)
     signature = ownerSigner.signHash(contract_transaction_hash)
-    safeProxy.execTransaction(
-        safeProxy.address,
+    candideWalletInit.execTransaction(
+        candideWalletInit.address,
         0,
         callData,
         0,
@@ -271,11 +281,11 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
        signature.signature.hex(), {'from':owner})
 
     #check if moduel is enabled
-    assert safeProxy.isModuleEnabled(socialRecoveryModule.address)
+    assert candideWalletInit.isModuleEnabled(socialRecoveryModule.address)
 
     # setup social recovery module - must be through a safe execTransaction call
     callData = socialRecoveryModule.setup.encode_input(friendsAddresses, 2)
-    ExecuteSocialRecoveryOperation(callData, safeProxy, socialRecoveryModule, owner)
+    ExecuteSocialRecoveryOperation(callData, candideWalletInit, socialRecoveryModule, owner)
 
     #check friends
     assert socialRecoveryModule.isFriend(friends[0])
@@ -285,18 +295,18 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
     newFriend = accounts[4].address
     callData = socialRecoveryModule.addFriendWithThreshold.encode_input(
         newFriend, 3)
-    ExecuteSocialRecoveryOperation(callData, safeProxy, socialRecoveryModule, owner)
+    ExecuteSocialRecoveryOperation(callData, candideWalletInit, socialRecoveryModule, owner)
     assert socialRecoveryModule.isFriend(newFriend)
 
     #remove friend
     callData = socialRecoveryModule.removeFriend.encode_input(2, 2)
-    ExecuteSocialRecoveryOperation(callData, safeProxy, socialRecoveryModule, owner)
+    ExecuteSocialRecoveryOperation(callData, candideWalletInit, socialRecoveryModule, owner)
     assert socialRecoveryModule.isFriend(newFriend) == False
 
     #create recovery data to initiate a recovry to a new owner
     newOwner = accounts[5]
     prevOwner = '0x0000000000000000000000000000000000000001'
-    recoveryData = safeProxy.swapOwner.encode_input(
+    recoveryData = candideWalletInit.swapOwner.encode_input(
         prevOwner,
         owner.address,
         newOwner.address)
@@ -327,10 +337,10 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
         newOwner.address, {'from': friends[0]})
     
     #check old owner is not owner anymore
-    assert safeProxy.isOwner(owner, {'from': notOwner}) == False
+    assert candideWalletInit.isOwner(owner, {'from': notOwner}) == False
 
     #check new owner is the current owner
-    assert safeProxy.isOwner(newOwner, {'from': notOwner}) == True
+    assert candideWalletInit.isOwner(newOwner, {'from': notOwner}) == True
 
     #prevOwner = owner
     owner = newOwner
@@ -339,7 +349,7 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
     Test Social Recovry module - confirm and recovery in one transaction
     """
     newOwner = accounts[6]
-    recoveryData = safeProxy.swapOwner.encode_input(
+    recoveryData = candideWalletInit.swapOwner.encode_input(
         prevOwner,
         owner.address,
         newOwner.address)
@@ -370,86 +380,69 @@ def test_transfer_from_entrypoint_with_init(moduleManager, safeProxy, socialReco
         {'from': friends[0]})
 
     #check old owner is not owner anymore
-    assert safeProxy.isOwner(owner, {'from': notOwner}) == False
+    assert candideWalletInit.isOwner(owner, {'from': notOwner}) == False
 
     #check new owner is the current owner
-    assert safeProxy.isOwner(newOwner, {'from': notOwner}) == True
+    assert candideWalletInit.isOwner(newOwner, {'from': notOwner}) == True
 
-def test_transfer_from_entrypoint_with_deposit_paymaster(safeProxy, tokenErc20, 
+def test_transfer_from_entrypoint_with_deposit_paymaster(candideWalletProxy, tokenErc20, 
         owner, bundler, entryPoint, depositPaymaster, receiver, accounts):
     """
     Test sponsor transaction fees with erc20 with a deposit paymaster
     """
-    accounts[0].transfer(safeProxy, "1 ether")
+    accounts[0].transfer(candideWalletProxy, "1 ether")
     beforeBalance = receiver.balance()
 
     accounts[0].transfer(owner, "3 ether")
     depositPaymaster.addStake(100, {'from':owner, 'value': "1 ether"})
     depositPaymaster.deposit({'from':owner, 'value': "1 ether"})
 
-    #assert "1 ether" == entryPoint.getDepositInfo(paymaster.address, {'from':owner})
     tokenErc20.approve(depositPaymaster.address, "1 ether", {'from':bundler})
-    tokenErc20.transfer(safeProxy.address, "1 ether", {'from':bundler})
+    tokenErc20.transfer(candideWalletProxy.address, "1 ether", {'from':bundler})
     bundlerBalance = tokenErc20.balanceOf(bundler)
-    depositPaymaster.addDepositFor(tokenErc20.address, safeProxy.address, "1 ether",
+    depositPaymaster.addDepositFor(tokenErc20.address, candideWalletProxy.address, "1 ether",
             {'from': bundler})
-    paymasterData = depositPaymaster.address[2:] + tokenErc20.address[2:]
+    paymasterAndData = depositPaymaster.address[2:] + tokenErc20.address[2:]
 
-    ExecuteEntryPointHandleOpsWithExecTransaction(
+    callData = candideWalletProxy.execTransactionFromEntrypoint.encode_input(
         receiver.address,
-        5,  #value to send
+        5,
         "0x",
         0,
-        215000,
-        215000,
-        100000,
-        tokenErc20.address,
-        bundler.address,
-        0,
-        owner,
-        bundler,
-        safeProxy,
-        depositPaymaster.address, 
-        paymasterData,
-        entryPoint)
-   
-    assert beforeBalance + 5 == receiver.balance() #verifing eth is sent
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000",
+        0)
+    
+    op = [
+            candideWalletProxy.address,
+            1,
+            bytes(0),
+            callData,
+            215000,
+            645000,
+            21000,
+            1000000,
+            1000000,
+            paymasterAndData,
+            '0x'
+            ]
+    ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
+    assert beforeBalance + 5 == receiver.balance()
 
-def test_transfer_from_entrypoint_with_candidePaymaster(safeProxy, tokenErc20, 
+def test_transfer_from_entrypoint_with_candidePaymaster(candideWalletProxy, tokenErc20, 
         owner, bundler, entryPoint, candidePaymaster, receiver, accounts):
     """
     Test sponsor transaction fees with erc20 with a verification paymaster
     """
-    accounts[0].transfer(safeProxy, "1 ether")
+    accounts[0].transfer(candideWalletProxy, "1 ether")
     beforeBalance = receiver.balance()
 
     accounts[0].transfer(bundler, "3 ether")
     candidePaymaster.addStake(100, {'from':bundler, 'value': "1 ether"})
     candidePaymaster.deposit({'from':bundler, 'value': "1 ether"})
 
-    tokenErc20.transfer(safeProxy.address, "1 ether", {'from':bundler})
+    tokenErc20.transfer(candideWalletProxy.address, "1 ether", {'from':bundler})
     
-    ops = []
-    approveCallData = tokenErc20.approve.encode_input(candidePaymaster.address, 10**8)
-    callData = safeProxy.execTransactionFromModule.encode_input(
-            tokenErc20.address,
-            0,
-            approveCallData,
-            0)
-    op = [
-        safeProxy.address,
-        0,
-        bytes(0),
-        callData,
-        2150000,
-        645000,
-        21000,
-        1000000,
-        1000000,
-        candidePaymaster.address,
-        bytes(0),
-        bytes(0)
-        ]
     maxTokenCost = 5
     maxTokenCostHex = str("{0:0{1}x}".format(maxTokenCost,40))
     
@@ -458,33 +451,19 @@ def test_transfer_from_entrypoint_with_candidePaymaster(safeProxy, tokenErc20,
 
     token = tokenErc20.address[2:]
 
-    datahash = candidePaymaster.getHash(op, maxTokenCost, costOfPost, tokenErc20.address)
-    bundlerSigner = w3.eth.account.from_key(bundler.private_key)
-    sig = bundlerSigner.signHash(datahash)
-        
-    paymasterData = maxTokenCostHex + costOfPostHex + token + sig.signature.hex()[2:]
-
-    op[10] = paymasterData
-
-    requestId = entryPoint.getRequestId(op)
-    
-    ownerSigner = w3.eth.account.from_key(owner.private_key)
-    message_hash = defunct_hash_message(requestId)
-    sig = ownerSigner.signHash(message_hash)
-    op[11] = sig.signature
-
-    ops.append(op)
-
     paymasterBeforeBalance = tokenErc20.balanceOf(candidePaymaster.address)
 
-    callData = safeProxy.execTransactionFromModule.encode_input(
+    callData = candideWalletProxy.execTransactionFromEntrypoint.encode_input(
         receiver.address,
         5,
         "0x",
-        0)
+        0,
+        candidePaymaster.address,
+        tokenErc20.address,
+        10**8)
 
     op = [
-            safeProxy.address,
+            candideWalletProxy.address,
             1,
             bytes(0),
             callData,
@@ -493,70 +472,16 @@ def test_transfer_from_entrypoint_with_candidePaymaster(safeProxy, tokenErc20,
             21000,
             1000000,
             1000000,
-            candidePaymaster.address,
             '0x',
             '0x'
             ]
-
 
     datahash = candidePaymaster.getHash(op, maxTokenCost, costOfPost, tokenErc20.address)
     bundlerSigner = w3.eth.account.from_key(bundler.private_key)
     sig = bundlerSigner.signHash(datahash)
-
-    paymasterData = maxTokenCostHex + costOfPostHex + token + sig.signature.hex()[2:]
-
-    op = [
-            safeProxy.address,
-            1,
-            bytes(0),
-            callData,
-            2150000,
-            645000,
-            21000,
-            1000000,
-            1000000,
-            candidePaymaster.address,
-            paymasterData,
-            '0x'
-            ]
-    
-    requestId = entryPoint.getRequestId(op)
-    ownerSigner = w3.eth.account.from_key(owner.private_key)
-    message_hash = defunct_hash_message(requestId)
-    sig = ownerSigner.signHash(message_hash)
-    op[11] = sig.signature
-
-    ops.append(op)
-    entryPoint.handleOps(ops, bundler, {'from': bundler})
+    paymasterAndData = candidePaymaster.address[2:] + maxTokenCostHex + costOfPostHex + token + sig.signature.hex()[2:]
+    op[9] = paymasterAndData
+    ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
    
     assert beforeBalance + 5 == receiver.balance() #verifing eth is sent
     assert tokenErc20.balanceOf(candidePaymaster.address) > paymasterBeforeBalance #verify paymaster is payed
-
-def test_validate_module_manager(moduleManager, safeProxy, entryPoint, owner, accounts):
-    """
-    Test validattion of Gnosis safe module manager
-    """
-    accounts[0].transfer(safeProxy, "1 ether")
-    callData = moduleManager.validateEip4337.encode_input(safeProxy.address, 
-        moduleManager.address)
-    op = [
-            safeProxy.address,
-            0,
-            bytes(0),
-            callData,
-            215000,
-            645000,
-            21000,
-            1000000,
-            1000000,
-            '0x0000000000000000000000000000000000000000',
-            '0x',
-            '0x'
-            ]
-    requestId = entryPoint.getRequestId(op)
-    ownerSigner = w3.eth.account.from_key(owner.private_key)
-    message_hash = defunct_hash_message(requestId)
-    sig = ownerSigner.signHash(message_hash)
-    op[11] = sig.signature
-
-    entryPoint.handleOps([op], owner, {'from': owner})
