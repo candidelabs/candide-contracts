@@ -1,18 +1,22 @@
-/**
- ** Account-Abstraction (EIP-4337) singleton EntryPoint implementation.
- ** Only one instance required on each chain.
- **/
+
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.12;
+
+/// @author eth-infinitism/account-abstraction - https://github.com/eth-infinitism/account-abstraction
+/// @author modified by CandideWallet Team
+
 
 /* solhint-disable avoid-low-level-calls */
 /* solhint-disable no-inline-assembly */
 /* solhint-disable reason-string */
-
 import "./UserOperation.sol";
 import "./IStakeManager.sol";
 import "./IAggregator.sol";
 
+/**
+ ** Account-Abstraction (EIP-4337) singleton EntryPoint implementation.
+ ** Only one instance required on each chain.
+ **/
 interface IEntryPoint is IStakeManager {
 
     /***
