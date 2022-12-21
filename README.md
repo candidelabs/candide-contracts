@@ -73,8 +73,8 @@ brownie test --network goerli-fork-dev
 test_bundler.py will only pass if the <a href='https://github.com/candidelabs/Candide-bundler-and-paymaster-RPC'>bundler RPC</a> is running 
 
 ## TODO
-- [ ] BLS signatures and aggregation
-- [ ] Atomic execution for multiple transactions
+- [*] BLS signatures and aggregation
+- [*] Atomic execution for multiple transactions
 - [ ] Supporting EIP-712 signatures
 
 
