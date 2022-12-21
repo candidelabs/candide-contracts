@@ -179,9 +179,9 @@ def test_transfer_from_entrypoint_with_init(candideWalletProxy, socialRecoveryMo
     #calculate proxy address 
     ff = bytes.fromhex('ff')
     proxyInit = walletProxyBytecode + walletProxyArgsEncoded
-    proxyInitHash = w3.soliditySha3(['bytes'],['0x' + proxyInit])
+    proxyInitHash = w3.solidityKeccak(['bytes'],['0x' + proxyInit])
     c2Nonce = 0
-    proxyAdd = w3.soliditySha3(['bytes1', 'address', 'uint256', 'bytes'], 
+    proxyAdd = w3.solidityKeccak(['bytes1', 'address', 'uint256', 'bytes'], 
         [ff, singletonFactory.address, c2Nonce, proxyInitHash])[-20:].hex()
 
     #send eth to the candideWalletProxy Contract address before deploying the candideWalletProxy contract

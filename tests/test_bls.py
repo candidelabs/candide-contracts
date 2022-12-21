@@ -16,7 +16,7 @@ def test_bls_pyecc_lib(testBLS):
     secret_key = 123
     public_key = get_public_key(secret_key)
     data = encode_hex("fooooo")
-    BLS_DOMAIN = w3.soliditySha3(['bytes'], [str.encode('eip4337.bls.domain')])
+    BLS_DOMAIN = w3.solidityKeccak(['bytes'], [str.encode('eip4337.bls.domain')])
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
     message_jac = affine_to_jacopian_G1(message_affine)
@@ -47,7 +47,7 @@ def test_wallet_bls_signature(bLSAccount, testBLS):
     pk1_int = wallet1.getBlsPublicKey()
     pk2_int = wallet2.getBlsPublicKey()
 
-    BLS_DOMAIN = bytes.fromhex(w3.soliditySha3(['bytes32'], 
+    BLS_DOMAIN = bytes.fromhex(w3.solidityKeccak(['bytes32'], 
         [str.encode('eip4337.bls.domain')]).hex()[2:])
     
     m1: bytes = bytes([1, 2, 3, 4, 5])
