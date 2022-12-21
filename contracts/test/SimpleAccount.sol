@@ -51,6 +51,13 @@ contract SimpleAccount is BaseAccount, UUPSUpgradeable, Initializable {
         //directly from EOA owner, or through the entryPoint (which gets redirected through execFromEntryPoint)
         require(msg.sender == owner || msg.sender == address(this), "only owner");
     }
+    
+    /**
+     * transfer eth value to a destination address
+     */
+    function transfer(address payable dest, uint256 amount) external onlyOwner {
+        dest.transfer(amount);
+    }
 
     /**
      * execute a transaction (called directly from owner, not by entryPoint)

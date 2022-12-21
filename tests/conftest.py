@@ -79,11 +79,13 @@ def singletonFactory(Contract):
     return Contract.from_explorer(SingletonFactory_add)
 
 @pytest.fixture(scope="module")
-def simpleWallet(SimpleWallet, entryPoint, owner):
+def simpleWallet(SimpleAccount, entryPoint, owner):
     """
     Deploy SimpleWallet contract
     """ 
-    return SimpleWallet.deploy(entryPoint.address, owner.address, {"from":owner})
+    sw =  SimpleAccount.deploy(entryPoint.address, {"from":owner})
+    sw.initialize(owner.address, {"from":owner})
+    return sw
 
 @pytest.fixture(scope="module")
 def socialRecoveryModule(SocialRecoveryModule, owner):

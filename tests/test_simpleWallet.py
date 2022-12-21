@@ -37,7 +37,7 @@ def test_owner_can_call_transfer_eth_through_entrypoint(simpleWallet, entryPoint
 
     accounts[0].transfer(simpleWallet, "1 ether")
     beforeBalance = accounts[1].balance()
-    callData = simpleWallet.execFromEntryPoint.encode_input(accounts[1], 5, "")
+    callData = simpleWallet.execute.encode_input(accounts[1], 5, "")
     op = [
             simpleWallet.address,
             0,
