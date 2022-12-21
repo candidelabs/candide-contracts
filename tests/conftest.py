@@ -1,11 +1,13 @@
 #!/user/bin/python3
 
 import pytest
-from brownie import Contract, CandideWallet, CandideWalletProxy, SocialRecoveryModule, DepositPaymaster, CompatibilityFallbackHandler
+from brownie import Contract, CandideWallet, CandideWalletProxy, BLSAccount, BLSOpen, TestBLS
 from brownie_tokens import ERC20
 from eth_account import Account
 from hexbytes import HexBytes
 import json
+import random
+from py_ecc.optimized_bn128 import *
 
 entryPoint_addr = '0xbdb76d21d9C1db55F0a37C9D26fe8C4aCD7e4D5e' #Goerli
 #entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
@@ -65,7 +67,7 @@ def entryPoint(Contract):
     """
     Fetch EntryPoint Contract from the specified address
     """
-    f = open('tests/EntryPoint.json')
+    f = open('tests/abi/EntryPoint.json')
     data = json.load(f)
     return Contract.from_abi("EntryPoint", entryPoint_addr, data["abi"])
 
@@ -154,3 +156,53 @@ def tokenErc20(bundler):
     amount = 100_000 * 10 ** 18
     tokenErc20._mint_for_testing(bundler, amount)
     return tokenErc20
+
+
+@pytest.fixture(scope="module")
+def bLSSignatureAggregator(BLSSignatureAggregator, entryPoint, owner):
+    """
+    Deploy SimpleWallet contract
+    """
+    BLSOpen.deploy({'from': owner})
+    return BLSSignatureAggregator.deploy({"from":owner})
+
+def get_public_key(secret_key: int):
+    return multiply(G2, secret_key)
+
+@pytest.fixture(scope="module")
+def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
+    """
+    Deploy SimpleWallet contract
+    """ 
+    random.seed(owner.address)
+
+    #geranrate private key sk1 
+    sk1 = random.randrange(curve_order)
+    pk1 = multiply(G2, sk1)
+
+    #generate private key sk2
+    sk2 = random.randrange(curve_order)
+    pk2 = multiply(G2, sk2)
+
+    deployer = BLSAccountFactory.deploy(entryPoint.address, bLSSignatureAggregator.address, {"from":owner})
+
+    pk1Norm = normalize(pk1)
+    pk2Norm = normalize(pk2)
+    pk1_int = [int(pk1Norm[0].coeffs[0]),int(pk1Norm[0].coeffs[1]),int(pk1Norm[1].coeffs[0]),int(pk1Norm[1].coeffs[1])]
+    pk2_int = [int(pk2Norm[0].coeffs[0]),int(pk2Norm[0].coeffs[1]),int(pk2Norm[1].coeffs[0]),int(pk2Norm[1].coeffs[1])]
+
+
+    wallet1Add = deployer.createAccount(0, pk1_int, {"from":owner}).new_contracts[0]
+    wallet2Add = deployer.createAccount(1, pk2_int, {"from":owner}).new_contracts[0]
+
+    wallet1 = Contract.from_abi("BLSWallet", wallet1Add, BLSAccount.abi)
+    wallet2 = Contract.from_abi("BLSWallet", wallet2Add, BLSAccount.abi)
+
+    return [[wallet1, wallet2], [sk1, sk2]]
+
+@pytest.fixture(scope="module")
+def testBLS(accounts):
+    """
+    Deploy SimpleWallet contract
+    """
+    return TestBLS.deploy({'from': accounts[0]})
