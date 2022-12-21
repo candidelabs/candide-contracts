@@ -173,7 +173,7 @@ def test_transfer_from_entrypoint_with_init(candideWalletProxy, socialRecoveryMo
 
     #initCode for deploying a new candideWalletProxy contract by the entrypoint
     walletProxyBytecode = CandideWalletProxy.bytecode
-    walletProxyArgsEncoded = eth_abi.encode_abi(['address'],
+    walletProxyArgsEncoded = eth_abi.encode(['address'],
         [candideWalletSingleton.address]).hex()
 
     #calculate proxy address 

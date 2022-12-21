@@ -107,7 +107,7 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccount, entryPoi
     sig1_affine = jacobian_to_affine_G1(sig1)
 
     #formate signature    
-    op1[10] = eth_abi.encode_abi(['uint256[2]'],[sig1_affine])
+    op1[10] = eth_abi.encode(['uint256[2]'],[sig1_affine])
     
     assert testBLS.verifySingle(sig1_affine, pk1_int, messageToSign1)
     assert bLSSignatureAggregator.validateUserOpSignature(op1) == '0x' 
@@ -136,7 +136,7 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccount, entryPoi
     sig2_affine = jacobian_to_affine_G1(sig2)
 
     #formate signature    
-    op2[10] = eth_abi.encode_abi(['uint256[2]'],[sig2_affine])
+    op2[10] = eth_abi.encode(['uint256[2]'],[sig2_affine])
     
     assert testBLS.verifySingle(sig2_affine, pk2_int, messageToSign2)
     assert bLSSignatureAggregator.validateUserOpSignature(op2) == '0x' 
@@ -144,7 +144,7 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccount, entryPoi
     agg_sig = bLSSignatureAggregator.aggregateSignatures([op1, op2])
 
     #assert value from aggregator contract is equal to py_ecc library aggregation
-    assert agg_sig == '0x' + eth_abi.encode_abi(['uint256[2]'],
+    assert agg_sig == '0x' + eth_abi.encode(['uint256[2]'],
         [jacobian_to_affine_G1(aggregate_signatures([sig1, sig2]))]).hex()
 
     #send ether to wallets
