@@ -8,6 +8,7 @@ from hexbytes import HexBytes
 import json
 import random
 from py_ecc.optimized_bn128 import *
+from  testBLSUtils import *
 
 entryPoint_addr = '0xbdb76d21d9C1db55F0a37C9D26fe8C4aCD7e4D5e' #Goerli
 #entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
@@ -163,7 +164,7 @@ def tokenErc20(bundler):
 @pytest.fixture(scope="module")
 def bLSSignatureAggregator(BLSSignatureAggregator, entryPoint, owner):
     """
-    Deploy SimpleWallet contract
+    Deploy BLSSignatureAggregator 
     """
     BLSOpen.deploy({'from': owner})
     return BLSSignatureAggregator.deploy({"from":owner})
@@ -174,28 +175,25 @@ def get_public_key(secret_key: int):
 @pytest.fixture(scope="module")
 def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
     """
-    Deploy SimpleWallet contract
+    Generate two bls wallets
     """ 
     random.seed(owner.address)
 
     #geranrate private key sk1 
     sk1 = random.randrange(curve_order)
-    pk1 = multiply(G2, sk1)
+    pk1 = get_public_key(sk1)
 
     #generate private key sk2
     sk2 = random.randrange(curve_order)
-    pk2 = multiply(G2, sk2)
+    pk2 = get_public_key(sk2)
 
     deployer = BLSAccountFactory.deploy(entryPoint.address, bLSSignatureAggregator.address, {"from":owner})
 
-    pk1Norm = normalize(pk1)
-    pk2Norm = normalize(pk2)
-    pk1_int = [int(pk1Norm[0].coeffs[0]),int(pk1Norm[0].coeffs[1]),int(pk1Norm[1].coeffs[0]),int(pk1Norm[1].coeffs[1])]
-    pk2_int = [int(pk2Norm[0].coeffs[0]),int(pk2Norm[0].coeffs[1]),int(pk2Norm[1].coeffs[0]),int(pk2Norm[1].coeffs[1])]
+    pubkey1_affine = jacobian_to_affine_G2(pk1)
+    pubkey2_affine = jacobian_to_affine_G2(pk2)
 
-
-    wallet1Add = deployer.createAccount(0, pk1_int, {"from":owner}).new_contracts[0]
-    wallet2Add = deployer.createAccount(1, pk2_int, {"from":owner}).new_contracts[0]
+    wallet1Add = deployer.createAccount(0, pubkey1_affine, {"from":owner}).new_contracts[0]
+    wallet2Add = deployer.createAccount(1, pubkey2_affine, {"from":owner}).new_contracts[0]
 
     wallet1 = Contract.from_abi("BLSWallet", wallet1Add, BLSAccount.abi)
     wallet2 = Contract.from_abi("BLSWallet", wallet2Add, BLSAccount.abi)
@@ -205,6 +203,6 @@ def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
 @pytest.fixture(scope="module")
 def testBLS(accounts):
     """
-    Deploy SimpleWallet contract
+    Deploy TestBLS
     """
     return TestBLS.deploy({'from': accounts[0]})
