@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "candidewalletcontracts"
-version = "0.1.1_beta_BLSMultisig"
+version = "0.1.1_beta"
 description = "Smart contracts used by Candide Wallet"
 authors = ["Candide Wallet Team"]
 license = "GPL3"
