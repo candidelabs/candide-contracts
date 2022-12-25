@@ -99,8 +99,8 @@ library  BLSHelperG2 {
         u[2] = mulQE(_x2, _z1, _pp);
         u[3] = mulQE(_x1, _z2, _pp);
 
-        require(u[2].e1 == u[3].e1 && u[2].e2 == u[3].e2 &&
-            u[0].e1 == u[1].e1 && u[0].e2 == u[1].e2, "Use Double function instead");
+        require(u[2].e1 != u[3].e1 || u[2].e2 != u[3].e2 ||
+            u[0].e1 != u[1].e1 || u[0].e2 != u[1].e2, "Both points can't be identical");
 
         if(u[2].e1 == u[3].e1 && u[2].e2 == u[3].e2){
             return (G2PointElement(1,0), G2PointElement(1,0), G2PointElement(0,0));
