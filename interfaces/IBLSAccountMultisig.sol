@@ -10,7 +10,5 @@ import "./IAggregatedAccount.sol";
  * a BLS multisig account should expose its own public key.
  */
 interface IBLSAccountMultisig is IAggregatedAccount {
-    function getBlsPublicKey() external view returns (uint256[4] memory);
     function getBlsPublicKey(bytes calldata signersBitmask) external view returns (uint256[4] memory);
-
 }

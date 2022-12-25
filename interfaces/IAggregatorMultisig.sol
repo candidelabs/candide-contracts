@@ -40,10 +40,10 @@ interface IAggregatorMultisig {
      /**
      * aggregate multiple publickeys into a single value.
      * @param pubKeys array of public keys to aggregate
-     * @param signature to extracte the signers bitmask from
+     * @param signersBitmask the signers bitmask from
      * @param threshold minimum number of signers
      * @return aggregatesPks the aggregated public keys
      */
-    function aggregatePublicKeys(uint256[4][] memory pubKeys, bytes calldata signature, uint256 threshold) 
+    function aggregatePublicKeys(uint256[4][] memory pubKeys, bytes calldata signersBitmask, uint256 threshold) 
         external pure returns(uint256[4] memory aggregatesPks);
 }

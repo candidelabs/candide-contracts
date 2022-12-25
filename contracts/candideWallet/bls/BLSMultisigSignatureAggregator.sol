@@ -22,7 +22,7 @@ contract BLSMultisigSignatureAggregator is IAggregatorMultisig {
         if (initCode.length > 0) {
             publicKey = getTrailingPublicKey(initCode);
         } else {
-            return IBLSAccountMultisig(userOp.sender).getBlsPublicKey(userOp.signature);
+            return IBLSAccountMultisig(userOp.sender).getBlsPublicKey(getTrailingBitmask(userOp.signature));
         }
     }
 
@@ -44,6 +44,12 @@ contract BLSMultisigSignatureAggregator is IAggregatorMultisig {
         }
     }
 
+    function getTrailingBitmask(bytes memory data) public pure returns (bytes memory bitmask) {
+        bytes memory t = new bytes(1);
+        t[0] = data[64];
+        bitmask = t; 
+    }
+
     function validateSignatures(UserOperation[] calldata userOps, bytes calldata signature)
     external view override {
         require(signature.length== 64, "BLS: invalid signature");
@@ -56,11 +62,8 @@ contract BLSMultisigSignatureAggregator is IAggregatorMultisig {
 
             UserOperation memory userOp = userOps[i];
             IBLSAccountMultisig blsAccount = IBLSAccountMultisig(userOp.sender);
-            if(userOp.signature.length > 64){
-                blsPublicKeys[i] = blsAccount.getBlsPublicKey(userOp.signature);
-            }else{
-                blsPublicKeys[i] = blsAccount.getBlsPublicKey();
-            }
+            
+            blsPublicKeys[i] = blsAccount.getBlsPublicKey(getTrailingBitmask(userOp.signature));
 
             messages[i] = _userOpToMessage(userOp, keccak256(abi.encode(blsPublicKeys[i])));
         }
@@ -165,24 +168,24 @@ contract BLSMultisigSignatureAggregator is IAggregatorMultisig {
     /**
      * aggregate multiple publickeys into a single value.
      * @param pubKeys array of public keys to aggregate
-     * @param signature to extracte the signers bitmask from
+     * @param signersBitmask the signers bitmask
      * @param threshold minimum number of signers
      * @return aggregatesPks the aggregated public keys
      */
-    function aggregatePublicKeys(uint256[4][] memory pubKeys, bytes calldata signature,
+    function aggregatePublicKeys(uint256[4][] memory pubKeys, bytes calldata signersBitmask,
         uint256 threshold) override external pure returns(uint256[4] memory aggregatesPks){
         
         if(pubKeys.length ==1){
             return pubKeys[0];
         }
 
-        require(signature.length > 64, "Bitmask should be attached to the signature");
+        require(signersBitmask.length == 1, "Wrong signers bitmask lenght");
 
         uint256[4][] memory signers = new uint256[4][](pubKeys.length);
-        bytes1 signersBitmask = signature[64];
+        bytes1 sb = signersBitmask[0];
         uint256 counter = 0;
         uint256 counter2 = 0;
-        uint8 b = uint8(signersBitmask);
+        uint8 b = uint8(sb);
         while(b > 0 && counter < pubKeys.length){
             if(b%2==1){
                 signers[counter2] = pubKeys[counter];
