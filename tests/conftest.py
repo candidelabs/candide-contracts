@@ -1,7 +1,7 @@
 #!/user/bin/python3
 
 import pytest
-from brownie import Contract, CandideWallet, CandideWalletProxy, BLSAccount, BLSOpen, TestBLS
+from brownie import Contract, CandideWallet, CandideWalletProxy, BLSAccount, BLSOpen, TestBLS, BLSAccountMultisig
 from brownie_tokens import ERC20
 from eth_account import Account
 from hexbytes import HexBytes
@@ -169,8 +169,13 @@ def bLSSignatureAggregator(BLSSignatureAggregator, entryPoint, owner):
     BLSOpen.deploy({'from': owner})
     return BLSSignatureAggregator.deploy({"from":owner})
 
-def get_public_key(secret_key: int):
-    return multiply(G2, secret_key)
+@pytest.fixture(scope="module")
+def bLSMultisigSignatureAggregator(BLSMultisigSignatureAggregator, entryPoint, owner):
+    """
+    Deploy BLSSignatureAggregatorMultisig 
+    """
+    BLSOpen.deploy({'from': owner})
+    return BLSMultisigSignatureAggregator.deploy({"from":owner})
 
 @pytest.fixture(scope="module")
 def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
@@ -189,8 +194,8 @@ def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
 
     deployer = BLSAccountFactory.deploy(entryPoint.address, bLSSignatureAggregator.address, {"from":owner})
 
-    pubkey1_affine = jacobian_to_affine_G2(pk1)
-    pubkey2_affine = jacobian_to_affine_G2(pk2)
+    pubkey1_affine = xyz_to_affine_G2(pk1)
+    pubkey2_affine = xyz_to_affine_G2(pk2)
 
     wallet1Add = deployer.createAccount(0, pubkey1_affine, {"from":owner}).new_contracts[0]
     wallet2Add = deployer.createAccount(1, pubkey2_affine, {"from":owner}).new_contracts[0]
@@ -199,6 +204,46 @@ def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
     wallet2 = Contract.from_abi("BLSWallet", wallet2Add, BLSAccount.abi)
 
     return [[wallet1, wallet2], [sk1, sk2]]
+
+@pytest.fixture(scope="module")
+def bLSAccountMultisig(BLSAccountMultisigFactory, bLSMultisigSignatureAggregator, entryPoint, owner):
+    """
+    Generate two bls multisig wallets
+    """ 
+    random.seed(owner.address)
+
+    #geranrate private key sk1 
+    sk1w1 = random.randrange(curve_order)
+    pk1w1 = get_public_key(sk1w1)
+
+    #generate private key sk2
+    sk2w1 = random.randrange(curve_order)
+    pk2w1 = get_public_key(sk2w1)
+    
+    #geranrate private key sk1 
+    sk1w2 = random.randrange(curve_order)
+    pk1w2 = get_public_key(sk1w2)
+
+    #generate private key sk2
+    sk2w2 = random.randrange(curve_order)
+    pk2w2 = get_public_key(sk2w2)
+    
+    deployer = BLSAccountMultisigFactory.deploy(entryPoint.address, 
+        bLSMultisigSignatureAggregator.address, {"from":owner})
+    
+    pubkey11_affine = xyz_to_affine_G2(pk1w1)
+    pubkey21_affine = xyz_to_affine_G2(pk2w1)
+    pubkey12_affine = xyz_to_affine_G2(pk1w2)
+    pubkey22_affine = xyz_to_affine_G2(pk2w2)
+
+    #                                   nonce, public keys                   , threshold 
+    wallet1Add = deployer.createAccount(0, [pubkey11_affine, pubkey21_affine], 1, {"from":owner}).new_contracts[0]
+    wallet2Add = deployer.createAccount(1, [pubkey12_affine, pubkey22_affine], 1, {"from":owner}).new_contracts[0]
+
+    wallet1 = Contract.from_abi("BLSWalletMultisig", wallet1Add, BLSAccountMultisig.abi)
+    wallet2 = Contract.from_abi("BLSWalletMultisig", wallet2Add, BLSAccountMultisig.abi)
+
+    return [[wallet1, wallet2], [[sk1w1, sk2w1], [sk1w2, sk2w2]]]
 
 @pytest.fixture(scope="module")
 def testBLS(accounts):

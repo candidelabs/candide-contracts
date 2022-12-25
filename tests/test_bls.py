@@ -5,10 +5,15 @@ from brownie import accounts, reverts
 
 from  testBLSUtils import *
 from web3.auto import w3
-import eth_abi
+from eth_abi.abi import encode
 
 from eth_utils import encode_hex
 
+"""
+Note: py_ecc uses homogeneous projective coordinates, while blsHelper.sol uses  
+Jacobian projective coordinates, so you should always converte a point to the
+affine form after processing it with py_ecc using xyz_to_affine_G1 and xyz_to_affine_G2
+"""
 def test_bls_pyecc_lib(testBLS):
     """
     Test bls signatures using py_ecc
@@ -19,15 +24,15 @@ def test_bls_pyecc_lib(testBLS):
     BLS_DOMAIN = w3.solidityKeccak(['bytes'], [str.encode('eip4337.bls.domain')])
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
-    message_jac = affine_to_jacopian_G1(message_affine)
+    message_jac = affine_to_xyz_G1(message_affine)
 
     sig = sign(message_jac, secret_key)
 
-    message_affine_2 = jacobian_to_affine_G1(message_jac)
+    message_affine_2 = xyz_to_affine_G1(message_jac)
     assert message_affine_2 == message_affine
 
-    pubkey_affine = jacobian_to_affine_G2(public_key)
-    sig_affine = jacobian_to_affine_G1(sig)
+    pubkey_affine = xyz_to_affine_G2(public_key)
+    sig_affine = xyz_to_affine_G1(sig)
     assert testBLS.verifySingle(sig_affine, pubkey_affine, message_affine)
 
 def test_wallet_bls_signature(bLSAccount, testBLS):
@@ -52,16 +57,16 @@ def test_wallet_bls_signature(bLSAccount, testBLS):
     
     m1: bytes = bytes([1, 2, 3, 4, 5])
     message1_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m1))
-    message1_jac = affine_to_jacopian_G1(message1_affine)
+    message1_jac = affine_to_xyz_G1(message1_affine)
     sig1 = sign(message1_jac, sk1)
 
     m2: bytes = bytes([1, 2, 3, 4, 5, 6, 7])
     message2_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m2))
-    message2_jac = affine_to_jacopian_G1(message2_affine)
+    message2_jac = affine_to_xyz_G1(message2_affine)
     sig2 = sign(message2_jac, sk2)
 
-    sig1_affine = jacobian_to_affine_G1(sig1)
-    sig2_affine = jacobian_to_affine_G1(sig2)
+    sig1_affine = xyz_to_affine_G1(sig1)
+    sig2_affine = xyz_to_affine_G1(sig2)
     
     assert testBLS.verifySingle(sig1_affine, pk1_int, message1_affine)
     assert testBLS.verifySingle(sig2_affine, pk2_int, message2_affine)
@@ -103,11 +108,11 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccount, entryPoi
     messageToSign1 = bLSSignatureAggregator.userOpToMessage(op1)
 
     #sign entrypoint operation hash
-    sig1 = sign(affine_to_jacopian_G1(messageToSign1), sk1)
-    sig1_affine = jacobian_to_affine_G1(sig1)
+    sig1 = sign(affine_to_xyz_G1(messageToSign1), sk1)
+    sig1_affine = xyz_to_affine_G1(sig1)
 
     #formate signature    
-    op1[10] = eth_abi.encode(['uint256[2]'],[sig1_affine])
+    op1[10] = encode(['uint256[2]'],[sig1_affine])
     
     assert testBLS.verifySingle(sig1_affine, pk1_int, messageToSign1)
     assert bLSSignatureAggregator.validateUserOpSignature(op1) == '0x' 
@@ -132,11 +137,11 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccount, entryPoi
     messageToSign2 = bLSSignatureAggregator.userOpToMessage(op2)
 
     #sign entrypoint operation hash
-    sig2 = sign(affine_to_jacopian_G1(messageToSign2), sk2)
-    sig2_affine = jacobian_to_affine_G1(sig2)
+    sig2 = sign(affine_to_xyz_G1(messageToSign2), sk2)
+    sig2_affine = xyz_to_affine_G1(sig2)
 
     #formate signature    
-    op2[10] = eth_abi.encode(['uint256[2]'],[sig2_affine])
+    op2[10] = encode(['uint256[2]'],[sig2_affine])
     
     assert testBLS.verifySingle(sig2_affine, pk2_int, messageToSign2)
     assert bLSSignatureAggregator.validateUserOpSignature(op2) == '0x' 
@@ -144,8 +149,8 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccount, entryPoi
     agg_sig = bLSSignatureAggregator.aggregateSignatures([op1, op2])
 
     #assert value from aggregator contract is equal to py_ecc library aggregation
-    assert agg_sig == '0x' + eth_abi.encode(['uint256[2]'],
-        [jacobian_to_affine_G1(aggregate_signatures([sig1, sig2]))]).hex()
+    assert agg_sig == '0x' + encode(['uint256[2]'],
+        [xyz_to_affine_G1(aggregate_signatures([sig1, sig2]))]).hex()
 
     #send ether to wallets
     accounts[0].transfer(wallet1, "1 ether")
