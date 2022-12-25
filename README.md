@@ -5,7 +5,7 @@
 </div>
 
 <div align="center">
-<img src="https://pbs.twimg.com/profile_banners/1528783691299930114/1653898682/1500x500" height =200/>
+<img src="https://user-images.githubusercontent.com/7014833/203773780-04a0c8c0-93a6-43a4-bb75-570cb951dfa0.png" height =200>
 </div>
 
 # About
@@ -60,23 +60,11 @@ brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
 brownie compile
 ```
 
-## Call trace for an Entrypoint call
-<img src="https://github.com/candidelabs/CandideWalletContracts/blob/main/docs/call_trace.png"/>
-
-## Contracts and bundler diagram
-<img src="https://github.com/candidelabs/CandideWalletContracts/blob/main/docs/diagram.png"/>
-
 ## Run all tests
 ```
 brownie test --network goerli-fork-dev
 ```
 test_bundler.py will only pass if the <a href='https://github.com/candidelabs/Candide-bundler-and-paymaster-RPC'>bundler RPC</a> is running 
-
-## TODO
-- [*] BLS signatures and aggregation
-- [*] Atomic execution for multiple transactions
-- [ ] Supporting EIP-712 signatures
-
 
 <!-- LICENSE -->
 ## License
@@ -88,4 +76,3 @@ GNU General Public License v3.0
 * <a href='https://github.com/eth-infinitism/account-abstraction'>eth-infinitism/account-abstraction</a>
 * <a href='https://github.com/safe-global/safe-contracts'>Gnosis Safe Contracts</a>
 * <a href='https://eips.ethereum.org/EIPS/eip-4337'>EIP-4337: Account Abstraction via Entry Point Contract specification </a>
-
