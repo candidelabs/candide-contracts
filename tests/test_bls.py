@@ -24,11 +24,11 @@ def test_bls_pyecc_lib(testBLS):
     BLS_DOMAIN = w3.solidityKeccak(['bytes'], [str.encode('eip4337.bls.domain')])
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
-    message_jac = affine_to_xyz_G1(message_affine)
+    message_xyz = affine_to_xyz_G1(message_affine)
 
-    sig = sign(message_jac, secret_key)
+    sig = sign(message_xyz, secret_key)
 
-    message_affine_2 = xyz_to_affine_G1(message_jac)
+    message_affine_2 = xyz_to_affine_G1(message_xyz)
     assert message_affine_2 == message_affine
 
     pubkey_affine = xyz_to_affine_G2(public_key)
@@ -57,13 +57,13 @@ def test_wallet_bls_signature(bLSAccount, testBLS):
     
     m1: bytes = bytes([1, 2, 3, 4, 5])
     message1_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m1))
-    message1_jac = affine_to_xyz_G1(message1_affine)
-    sig1 = sign(message1_jac, sk1)
+    message1_xyz = affine_to_xyz_G1(message1_affine)
+    sig1 = sign(message1_xyz, sk1)
 
     m2: bytes = bytes([1, 2, 3, 4, 5, 6, 7])
     message2_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m2))
-    message2_jac = affine_to_xyz_G1(message2_affine)
-    sig2 = sign(message2_jac, sk2)
+    message2_xyz = affine_to_xyz_G1(message2_affine)
+    sig2 = sign(message2_xyz, sk2)
 
     sig1_affine = xyz_to_affine_G1(sig1)
     sig2_affine = xyz_to_affine_G1(sig2)

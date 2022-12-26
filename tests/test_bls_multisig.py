@@ -29,10 +29,10 @@ def test_bls_pyecc_lib(testBLS):
     BLS_DOMAIN = w3.solidityKeccak(['bytes'], [str.encode('eip4337.bls.domain')])
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
-    message_jac = affine_to_xyz_G1(message_affine)
+    message_xyz = affine_to_xyz_G1(message_affine)
 
-    sig1 = sign(message_jac, secret_key1)
-    sig2 = sign(message_jac, secret_key2)
+    sig1 = sign(message_xyz, secret_key1)
+    sig2 = sign(message_xyz, secret_key2)
 
     agg_sig = aggregate_signatures([sig1, sig2])
     agg_pubkey = aggregate_public_keys([public_key1, public_key2])
@@ -71,16 +71,16 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     #multisig sign message1 using wallet1
     m1: bytes = bytes([1, 2, 3, 4, 5])
     message1_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m1))
-    message1_jac = affine_to_xyz_G1(message1_affine)
-    sig1w1 = sign(message1_jac, sk1w1)
-    sig2w1 = sign(message1_jac, sk2w1)
+    message1_xyz = affine_to_xyz_G1(message1_affine)
+    sig1w1 = sign(message1_xyz, sk1w1)
+    sig2w1 = sign(message1_xyz, sk2w1)
 
     #multisig sign message2 using wallet2
     m2: bytes = bytes([1, 2, 3, 4, 5, 6, 7])
     message2_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m2))
-    message2_jac = affine_to_xyz_G1(message2_affine)
-    sig1w2 = sign(message2_jac, sk1w2)
-    sig2w2 = sign(message2_jac, sk2w2)
+    message2_xyz = affine_to_xyz_G1(message2_affine)
+    sig1w2 = sign(message2_xyz, sk1w2)
+    sig2w2 = sign(message2_xyz, sk2w2)
 
     #aggregate signatures to create one signature per wallet
     agg_sig_w1 = aggregate_signatures([sig1w1, sig2w1])
@@ -91,12 +91,12 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     #aggregate public keys to create one public key per wallet
     agg_pubkey_w1 = aggregate_public_keys([pk1w1, pk2w1])
     agg_pubkey_w2 = aggregate_public_keys([pk1w2, pk2w2])
-    agg_pubkey_w1_jac = xyz_to_affine_G2(agg_pubkey_w1)
-    agg_pubkey_w2_jac = xyz_to_affine_G2(agg_pubkey_w2)
+    agg_pubkey_w1_xyz = xyz_to_affine_G2(agg_pubkey_w1)
+    agg_pubkey_w2_xyz = xyz_to_affine_G2(agg_pubkey_w2)
 
     #verify aggregated public key and signature per wallet for each message
-    assert testBLS.verifySingle(agg_sig_w1_affine, agg_pubkey_w1_jac, message1_affine)
-    assert testBLS.verifySingle(agg_sig_w2_affine, agg_pubkey_w2_jac, message2_affine)
+    assert testBLS.verifySingle(agg_sig_w1_affine, agg_pubkey_w1_xyz, message1_affine)
+    assert testBLS.verifySingle(agg_sig_w2_affine, agg_pubkey_w2_xyz, message2_affine)
     
     #aggregate the 2 wallets signatures
     agg_sig = aggregate_signatures([agg_sig_w1, agg_sig_w2])
@@ -104,7 +104,7 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
 
     #verify the overall aggregated signature for both messages
     assert testBLS.verifyMultiple(agg_sig_affine, 
-                                [agg_pubkey_w1_jac, agg_pubkey_w2_jac],
+                                [agg_pubkey_w1_xyz, agg_pubkey_w2_xyz],
                                 [message1_affine, message2_affine])
 
 def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccountMultisig, 
