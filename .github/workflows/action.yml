@@ -1,6 +1,6 @@
 #poetry github actions from : https://jacobian.org/til/github-actions-poetry/
 
-on: push:
+on: push
 
 jobs:
   test:
