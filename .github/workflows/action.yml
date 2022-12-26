@@ -57,7 +57,6 @@ jobs:
           poetry run brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
           poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork="https://goerli.infura.io/v3/$WEB3_INFURA_PROJECT_ID" accounts=10 mnemonic=brownie port=8545 
           poetry run brownie networks modify goerli-fork-dev explorer="https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN"
-          poetry run brownie compile
           poetry run brownie test --network goerli-fork-dev
 
   flake8-lint:
