@@ -23,7 +23,7 @@ dependencies:
   - safe-global/safe-contracts@1.3.0-libs.0
 
 compiler:
-  evm_version: null
+  evm_version: london
   solc:
     optimizer:
       enabled: true
