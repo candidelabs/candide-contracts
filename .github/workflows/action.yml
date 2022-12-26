@@ -44,6 +44,8 @@ jobs:
 
       - run: poetry install --no-interaction
 
+      - run: touch .env
+
       - run: poetry run brownie pm install safe-global/safe-contracts@1.3.0-libs.0 
       - run: poetry run brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
       - run: poetry run brownie test --network goerli-fork-dev
