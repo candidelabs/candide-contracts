@@ -1,18 +1,26 @@
 #!/usr/bin/python3
 
-import pytest
-from brownie import accounts, reverts
-
-from testBLSUtils import *
+from brownie import accounts  # noqa: F401
+from testBLSUtils import (
+    sign,
+    aggregate_signatures,
+    aggregate_public_keys,
+    affine_to_xyz_G1,
+    affine_to_xyz_G2,
+    get_public_key,
+    xyz_to_affine_G1,
+    xyz_to_affine_G2,
+)
 from web3.auto import w3
 from eth_abi.abi import encode
 
 from eth_utils.hexadecimal import encode_hex
 
 """
-Note: py_ecc uses homogeneous projective coordinates, while blsHelper.sol uses  
+Note: py_ecc uses homogeneous projective coordinates, while blsHelper.sol uses
 Jacobian projective coordinates, so you should always converte a point to the
-affine form after processing it with py_ecc using xyz_to_affine_G1 and xyz_to_affine_G2
+affine form after processing it with py_ecc using xyz_to_affine_G1
+and xyz_to_affine_G2
 """
 
 
@@ -28,7 +36,9 @@ def test_bls_pyecc_lib(testBLS):
     public_key1 = get_public_key(secret_key1)
     public_key2 = get_public_key(secret_key2)
     data = encode_hex("fooooo")
-    BLS_DOMAIN = w3.solidityKeccak(["bytes"], [str.encode("eip4337.bls.domain")])
+    BLS_DOMAIN = w3.solidityKeccak(
+        ["bytes"], [str.encode("eip4337.bls.domain")]
+    )
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
     message_xyz = affine_to_xyz_G1(message_affine)
@@ -46,8 +56,8 @@ def test_bls_pyecc_lib(testBLS):
 
 def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     """
-    Test retriving public key from bls wallet instance and signing and verifying
-    signatures
+    Test retriving public key from bls wallet instance and signing and
+    verifying signatures
     """
     # get private keys for wallet1
     sk1w1 = bLSAccountMultisig[1][0][0]
@@ -69,7 +79,9 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     pk2w2 = affine_to_xyz_G2(pk2w2_int)
 
     BLS_DOMAIN = bytes.fromhex(
-        w3.solidityKeccak(["bytes32"], [str.encode("eip4337.bls.domain")]).hex()[2:]
+        w3.solidityKeccak(
+            ["bytes32"], [str.encode("eip4337.bls.domain")]
+        ).hex()[2:]
     )
 
     # multisig sign message1 using wallet1
@@ -99,8 +111,12 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     agg_pubkey_w2_xyz = xyz_to_affine_G2(agg_pubkey_w2)
 
     # verify aggregated public key and signature per wallet for each message
-    assert testBLS.verifySingle(agg_sig_w1_affine, agg_pubkey_w1_xyz, message1_affine)
-    assert testBLS.verifySingle(agg_sig_w2_affine, agg_pubkey_w2_xyz, message2_affine)
+    assert testBLS.verifySingle(
+        agg_sig_w1_affine, agg_pubkey_w1_xyz, message1_affine
+    )
+    assert testBLS.verifySingle(
+        agg_sig_w2_affine, agg_pubkey_w2_xyz, message2_affine
+    )
 
     # aggregate the 2 wallets signatures
     agg_sig = aggregate_signatures([agg_sig_w1, agg_sig_w2])
@@ -119,7 +135,7 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(
     entryPoint,
     bLSMultisigSignatureAggregator,
     owner,
-    accounts,
+    accounts,  # noqa: F811
     receiver,
     testBLS,
 ):
@@ -174,7 +190,9 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(
     # bitmask for signers(11 in binary = 3 decinal)
     op1[10] = encode(["uint256[2]"], [agg_sig_w1_affine]) + bytes([3])
 
-    assert testBLS.verifySingle(agg_sig_w1_affine, agg_pubkey_w1, messageToSign1)
+    assert testBLS.verifySingle(
+        agg_sig_w1_affine, agg_pubkey_w1, messageToSign1
+    )
 
     # create call data from wallet2
     callData2 = wallet2.execute.encode_input(receiver, 10, "")
@@ -208,7 +226,9 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(
     # bitmask for signers(11 in binary = 3 decinal)
     op2[10] = encode(["uint256[2]"], [agg_sig_w2_affine]) + bytes([3])
 
-    assert testBLS.verifySingle(agg_sig_w2_affine, agg_pubkey_w2, messageToSign2)
+    assert testBLS.verifySingle(
+        agg_sig_w2_affine, agg_pubkey_w2, messageToSign2
+    )
 
     agg_sig_overall = (
         "0x"
@@ -225,7 +245,13 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(
     beforeBalance = receiver.balance()
 
     entryPoint.handleAggregatedOps(
-        [[[op1, op2], bLSMultisigSignatureAggregator.address, agg_sig_overall]],
+        [
+            [
+                [op1, op2],
+                bLSMultisigSignatureAggregator.address,
+                agg_sig_overall,
+            ]
+        ],
         owner,
         {"from": owner},
     )

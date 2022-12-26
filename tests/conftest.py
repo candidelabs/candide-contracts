@@ -11,23 +11,20 @@ from brownie import (
     BLSAccountMultisig,
 )
 from brownie_tokens import ERC20
-from eth_account import Account
-from hexbytes import HexBytes
 import json
 import random
-from py_ecc.optimized_bn128 import *
-from testBLSUtils import *
+from py_ecc.optimized_bn128.optimized_curve import curve_order
+from testBLSUtils import get_public_key, xyz_to_affine_G2
 
 entryPoint_addr = "0xbdb76d21d9C1db55F0a37C9D26fe8C4aCD7e4D5e"  # Goerli
 # entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
 SingletonFactory_add = "0xce0042B868300000d44A59004Da54A005ffdcf9f"
-bundler_pk = "e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4"  # should be the same as the bundler's RPC
+# should be the same as the bundler's RPC
+bundler_pk = "e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4"  # noqa: E501
 
 
 @pytest.fixture(scope="function", autouse=True)
 def isolate(fn_isolation):
-    # perform a chain rewind after completing each test, to ensure proper isolation
-    # https://eth-brownie.readthedocs.io/en/v1.10.3/tests-pytest-intro.html#isolation-fixtures
     pass
 
 
@@ -137,8 +134,11 @@ def candideWalletProxy(
     """
     Deploy a proxy contract for GnosisSafe
     """
-    sp = CandideWalletProxy.deploy(candideWalletSingleton.address, {"from": owner})
-    # returning a proxy instance with the target abi to facilitate diligate call
+    sp = CandideWalletProxy.deploy(
+        candideWalletSingleton.address, {"from": owner}
+    )
+    # returning a proxy instance with the target abi
+    # to facilitate diligate call
     candideWallet = Contract.from_abi(
         "CandideWallet", sp.address, candideWalletSingleton.abi
     )
@@ -164,11 +164,15 @@ def candidePaymaster(CandidePaymaster, entryPoint, bundler):
     """
     Deploy CandidePaymaster contract
     """
-    return CandidePaymaster.deploy(entryPoint.address, bundler, {"from": bundler})
+    return CandidePaymaster.deploy(
+        entryPoint.address, bundler, {"from": bundler}
+    )
 
 
 @pytest.fixture(scope="module")
-def depositPaymaster(DepositPaymaster, entryPoint, TokenPriceOracle, tokenErc20, owner):
+def depositPaymaster(
+    DepositPaymaster, entryPoint, TokenPriceOracle, tokenErc20, owner
+):
     """
     Deploy DepositPaymaster contract
     """
@@ -192,7 +196,7 @@ def tokenErc20(bundler):
 
 
 @pytest.fixture(scope="module")
-def bLSSignatureAggregator(BLSSignatureAggregator, entryPoint, owner):
+def bLSSignatureAggregator(BLSSignatureAggregator, owner):
     """
     Deploy BLSSignatureAggregator
     """
@@ -201,7 +205,7 @@ def bLSSignatureAggregator(BLSSignatureAggregator, entryPoint, owner):
 
 
 @pytest.fixture(scope="module")
-def bLSMultisigSignatureAggregator(BLSMultisigSignatureAggregator, entryPoint, owner):
+def bLSMultisigSignatureAggregator(BLSMultisigSignatureAggregator, owner):
     """
     Deploy BLSSignatureAggregatorMultisig
     """
@@ -246,7 +250,10 @@ def bLSAccount(BLSAccountFactory, bLSSignatureAggregator, entryPoint, owner):
 
 @pytest.fixture(scope="module")
 def bLSAccountMultisig(
-    BLSAccountMultisigFactory, bLSMultisigSignatureAggregator, entryPoint, owner
+    BLSAccountMultisigFactory,
+    bLSMultisigSignatureAggregator,
+    entryPoint,
+    owner,
 ):
     """
     Generate two bls multisig wallets
@@ -270,7 +277,9 @@ def bLSAccountMultisig(
     pk2w2 = get_public_key(sk2w2)
 
     deployer = BLSAccountMultisigFactory.deploy(
-        entryPoint.address, bLSMultisigSignatureAggregator.address, {"from": owner}
+        entryPoint.address,
+        bLSMultisigSignatureAggregator.address,
+        {"from": owner},
     )
 
     pubkey11_affine = xyz_to_affine_G2(pk1w1)
@@ -278,7 +287,6 @@ def bLSAccountMultisig(
     pubkey12_affine = xyz_to_affine_G2(pk1w2)
     pubkey22_affine = xyz_to_affine_G2(pk2w2)
 
-    #                                   nonce, public keys                   , threshold
     wallet1Add = deployer.createAccount(
         0, [pubkey11_affine, pubkey21_affine], 1, {"from": owner}
     ).new_contracts[0]
@@ -286,8 +294,12 @@ def bLSAccountMultisig(
         1, [pubkey12_affine, pubkey22_affine], 1, {"from": owner}
     ).new_contracts[0]
 
-    wallet1 = Contract.from_abi("BLSWalletMultisig", wallet1Add, BLSAccountMultisig.abi)
-    wallet2 = Contract.from_abi("BLSWalletMultisig", wallet2Add, BLSAccountMultisig.abi)
+    wallet1 = Contract.from_abi(
+        "BLSWalletMultisig", wallet1Add, BLSAccountMultisig.abi
+    )
+    wallet2 = Contract.from_abi(
+        "BLSWalletMultisig", wallet2Add, BLSAccountMultisig.abi
+    )
 
     return [[wallet1, wallet2], [[sk1w1, sk2w1], [sk1w2, sk2w2]]]
 

@@ -1,18 +1,23 @@
 #!/usr/bin/python3
 
-import pytest
-from brownie import accounts, reverts
-
-from testBLSUtils import *
+from brownie import accounts  # noqa: F401
+from testBLSUtils import (
+    sign,
+    affine_to_xyz_G1,
+    get_public_key,
+    xyz_to_affine_G2,
+)
+from testBLSUtils import xyz_to_affine_G1, aggregate_signatures
 from web3.auto import w3
 from eth_abi.abi import encode
 
-from eth_utils import encode_hex
+from eth_utils.hexadecimal import encode_hex
 
 """
-Note: py_ecc uses homogeneous projective coordinates, while blsHelper.sol uses  
+Note: py_ecc uses homogeneous projective coordinates, while blsHelper.sol uses
 Jacobian projective coordinates, so you should always converte a point to the
-affine form after processing it with py_ecc using xyz_to_affine_G1 and xyz_to_affine_G2
+affine form after processing it with py_ecc using xyz_to_affine_G1 and
+xyz_to_affine_G2
 """
 
 
@@ -23,7 +28,9 @@ def test_bls_pyecc_lib(testBLS):
     secret_key = 123
     public_key = get_public_key(secret_key)
     data = encode_hex("fooooo")
-    BLS_DOMAIN = w3.solidityKeccak(["bytes"], [str.encode("eip4337.bls.domain")])
+    BLS_DOMAIN = w3.solidityKeccak(
+        ["bytes"], [str.encode("eip4337.bls.domain")]
+    )
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
     message_xyz = affine_to_xyz_G1(message_affine)
@@ -40,8 +47,8 @@ def test_bls_pyecc_lib(testBLS):
 
 def test_wallet_bls_signature(bLSAccount, testBLS):
     """
-    Test retriving public key from bls wallet instance and signing and verifying
-    signatures
+    Test retriving public key from bls wallet instance and signing
+    and verifying signatures
     """
     # get private keys
     sk1 = bLSAccount[1][0]
@@ -56,7 +63,9 @@ def test_wallet_bls_signature(bLSAccount, testBLS):
     pk2_int = wallet2.getBlsPublicKey()
 
     BLS_DOMAIN = bytes.fromhex(
-        w3.solidityKeccak(["bytes32"], [str.encode("eip4337.bls.domain")]).hex()[2:]
+        w3.solidityKeccak(
+            ["bytes32"], [str.encode("eip4337.bls.domain")]
+        ).hex()[2:]
     )
 
     m1: bytes = bytes([1, 2, 3, 4, 5])
@@ -77,7 +86,13 @@ def test_wallet_bls_signature(bLSAccount, testBLS):
 
 
 def test_wallet_bls_aggregated_signature_through_entrypoint(
-    bLSAccount, entryPoint, bLSSignatureAggregator, owner, accounts, receiver, testBLS
+    bLSAccount,
+    entryPoint,
+    bLSSignatureAggregator,
+    owner,
+    accounts,  # noqa: F811
+    receiver,
+    testBLS,
 ):
     """
     Test BLS aggregation through 4337 entrypoint
@@ -154,12 +169,14 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(
 
     agg_sig = bLSSignatureAggregator.aggregateSignatures([op1, op2])
 
-    # assert value from aggregator contract is equal to py_ecc library aggregation
+    # assert value from aggregator contract is equal to py_ecc
+    # library aggregation
     assert (
         agg_sig
         == "0x"
         + encode(
-            ["uint256[2]"], [xyz_to_affine_G1(aggregate_signatures([sig1, sig2]))]
+            ["uint256[2]"],
+            [xyz_to_affine_G1(aggregate_signatures([sig1, sig2]))],
         ).hex()
     )
 
@@ -170,7 +187,9 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(
     beforeBalance = receiver.balance()
 
     entryPoint.handleAggregatedOps(
-        [[[op1, op2], bLSSignatureAggregator.address, agg_sig]], owner, {"from": owner}
+        [[[op1, op2], bLSSignatureAggregator.address, agg_sig]],
+        owner,
+        {"from": owner},
     )
 
     # check if the two transaction was excuted using aggregated operations

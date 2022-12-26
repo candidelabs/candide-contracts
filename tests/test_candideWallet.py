@@ -1,13 +1,15 @@
 #!/usr/bin/python3
 
-import pytest
 from brownie import Contract, reverts, CandideWalletProxy
 from web3.auto import w3
-from eth_account.messages import defunct_hash_message
 from eth_account import Account, messages
 from hexbytes import HexBytes
 import eth_abi
-from testUtils import *
+from testUtils import (
+    ExecuteExecTransaction,
+    ExecuteEntryPointHandleOps,
+    ExecuteSocialRecoveryOperation,
+)
 
 
 def test_VERSION(candideWalletProxy):
@@ -25,7 +27,13 @@ def test_owner(candideWalletProxy, owner):
 
 
 def test_transaction_from_proxy_directly(
-    candideWalletProxy, owner, notOwner, bundler, tokenErc20, receiver, accounts
+    candideWalletProxy,
+    owner,
+    notOwner,
+    bundler,
+    tokenErc20,
+    receiver,
+    accounts,
 ):
     """
     Create a  transaction and call the proxy directly and check eth transfer
@@ -140,7 +148,6 @@ def test_transaction_through_entrypoint(
     """
     accounts[0].transfer(candideWalletProxy, "1 ether")  # Add ether to wallet
     beforeBalance = receiver.balance()
-    nonce = 1
 
     callData = candideWalletProxy.execTransactionFromEntrypoint.encode_input(
         receiver.address,
@@ -193,7 +200,8 @@ def test_transfer_from_entrypoint_with_init(
     """
     beforeBalance = receiver.balance()
 
-    # initCode for deploying a new candideWalletProxy contract by the entrypoint
+    # initCode for deploying a new candideWalletProxy
+    # contract by the entrypoint
     walletProxyBytecode = CandideWalletProxy.bytecode
     walletProxyArgsEncoded = eth_abi.encode(
         ["address"], [candideWalletSingleton.address]
@@ -209,7 +217,8 @@ def test_transfer_from_entrypoint_with_init(
         [ff, singletonFactory.address, c2Nonce, proxyInitHash],
     )[-20:].hex()
 
-    # send eth to the candideWalletProxy Contract address before deploying the candideWalletProxy contract
+    # send eth to the candideWalletProxy Contract address
+    # before deploying the candideWalletProxy contract
     accounts[0].transfer(proxyAdd, "1.05 ether")
 
     initCode = (
@@ -284,7 +293,9 @@ def test_transfer_from_entrypoint_with_init(
     """
     # add social recovery module contract to enabled modules
     friendsAddresses = [friends[0].address, friends[1].address]
-    callData = candideWalletInit.enableModule.encode_input(socialRecoveryModule.address)
+    callData = candideWalletInit.enableModule.encode_input(
+        socialRecoveryModule.address
+    )
     nonce = candideWalletInit.nonce()
 
     tx_hash = candideWalletInit.getTransactionHash(
@@ -320,7 +331,7 @@ def test_transfer_from_entrypoint_with_init(
     # check if moduel is enabled
     assert candideWalletInit.isModuleEnabled(socialRecoveryModule.address)
 
-    # setup social recovery module - must be through a safe execTransaction call
+    # setup social recovery module
     callData = socialRecoveryModule.setup.encode_input(friendsAddresses, 2)
     ExecuteSocialRecoveryOperation(
         callData, candideWalletInit, socialRecoveryModule, owner
@@ -332,7 +343,9 @@ def test_transfer_from_entrypoint_with_init(
 
     # add friend
     newFriend = accounts[4].address
-    callData = socialRecoveryModule.addFriendWithThreshold.encode_input(newFriend, 3)
+    callData = socialRecoveryModule.addFriendWithThreshold.encode_input(
+        newFriend, 3
+    )
     ExecuteSocialRecoveryOperation(
         callData, candideWalletInit, socialRecoveryModule, owner
     )
@@ -343,7 +356,7 @@ def test_transfer_from_entrypoint_with_init(
     ExecuteSocialRecoveryOperation(
         callData, candideWalletInit, socialRecoveryModule, owner
     )
-    assert socialRecoveryModule.isFriend(newFriend) == False
+    assert socialRecoveryModule.isFriend(newFriend) == False  # noqa: E712
 
     # create recovery data to initiate a recovry to a new owner
     newOwner = accounts[5]
@@ -351,14 +364,16 @@ def test_transfer_from_entrypoint_with_init(
     recoveryData = candideWalletInit.swapOwner.encode_input(
         prevOwner, owner.address, newOwner.address
     )
-    dataHash = socialRecoveryModule.getDataHash(recoveryData, {"from": friends[0]})
+    dataHash = socialRecoveryModule.getDataHash(
+        recoveryData, {"from": friends[0]}
+    )
 
     # will revert no friends confirmed
     assert (
         socialRecoveryModule.isConfirmedByRequiredFriends(
             dataHash, {"from": friends[0]}
         )
-        == False
+        == False  # noqa: E712
     )
     with reverts():
         socialRecoveryModule.recoverAccess(
@@ -372,7 +387,7 @@ def test_transfer_from_entrypoint_with_init(
         socialRecoveryModule.isConfirmedByRequiredFriends(
             dataHash, {"from": friends[0]}
         )
-        == False
+        == False  # noqa: E712
     )
     with reverts():
         socialRecoveryModule.recoverAccess(
@@ -381,22 +396,23 @@ def test_transfer_from_entrypoint_with_init(
 
     socialRecoveryModule.confirmTransaction(dataHash, {"from": friends[1]})
 
-    # recovery process will succeed if number of confirmation is equal or bigger than threshold = 2
+    # recovery process will succeed if number of confirmation
+    # is equal or bigger than threshold = 2
     assert (
         socialRecoveryModule.isConfirmedByRequiredFriends(
             dataHash, {"from": friends[0]}
         )
-        == True
+        == True  # noqa: E712
     )
     socialRecoveryModule.recoverAccess(
         prevOwner, owner.address, newOwner.address, {"from": friends[0]}
     )
 
     # check old owner is not owner anymore
-    assert candideWalletInit.isOwner(owner, {"from": notOwner}) == False
+    assert candideWalletInit.isOwner(owner, {"from": notOwner}) == False  # noqa: E712, E501
 
     # check new owner is the current owner
-    assert candideWalletInit.isOwner(newOwner, {"from": notOwner}) == True
+    assert candideWalletInit.isOwner(newOwner, {"from": notOwner}) == True  # noqa: E712, E501
 
     # prevOwner = owner
     owner = newOwner
@@ -408,7 +424,9 @@ def test_transfer_from_entrypoint_with_init(
     recoveryData = candideWalletInit.swapOwner.encode_input(
         prevOwner, owner.address, newOwner.address
     )
-    dataHash = socialRecoveryModule.getDataHash(recoveryData, {"from": friends[0]})
+    dataHash = socialRecoveryModule.getDataHash(
+        recoveryData, {"from": friends[0]}
+    )
 
     # will revert no friends confirmed
     with reverts():
@@ -444,10 +462,10 @@ def test_transfer_from_entrypoint_with_init(
     )
 
     # check old owner is not owner anymore
-    assert candideWalletInit.isOwner(owner, {"from": notOwner}) == False
+    assert candideWalletInit.isOwner(owner, {"from": notOwner}) == False  # noqa: E712, E501
 
     # check new owner is the current owner
-    assert candideWalletInit.isOwner(newOwner, {"from": notOwner}) == True
+    assert candideWalletInit.isOwner(newOwner, {"from": notOwner}) == True  # noqa: E712, E501
 
 
 def test_transfer_from_entrypoint_with_deposit_paymaster(
@@ -471,10 +489,14 @@ def test_transfer_from_entrypoint_with_deposit_paymaster(
     depositPaymaster.deposit({"from": owner, "value": "1 ether"})
 
     tokenErc20.approve(depositPaymaster.address, "1 ether", {"from": bundler})
-    tokenErc20.transfer(candideWalletProxy.address, "1 ether", {"from": bundler})
-    bundlerBalance = tokenErc20.balanceOf(bundler)
+    tokenErc20.transfer(
+        candideWalletProxy.address, "1 ether", {"from": bundler}
+    )
     depositPaymaster.addDepositFor(
-        tokenErc20.address, candideWalletProxy.address, "1 ether", {"from": bundler}
+        tokenErc20.address,
+        candideWalletProxy.address,
+        "1 ether",
+        {"from": bundler},
     )
     paymasterAndData = depositPaymaster.address[2:] + tokenErc20.address[2:]
 
@@ -525,7 +547,9 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
     candidePaymaster.addStake(100, {"from": bundler, "value": "1 ether"})
     candidePaymaster.deposit({"from": bundler, "value": "1 ether"})
 
-    tokenErc20.transfer(candideWalletProxy.address, "1 ether", {"from": bundler})
+    tokenErc20.transfer(
+        candideWalletProxy.address, "1 ether", {"from": bundler}
+    )
 
     maxTokenCost = 5
     maxTokenCostHex = str("{0:0{1}x}".format(maxTokenCost, 40))

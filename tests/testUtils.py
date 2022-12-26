@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 
-import pytest
-from brownie import Contract
 from web3.auto import w3
 from eth_account.messages import defunct_hash_message
 from eth_account import Account
@@ -14,7 +12,7 @@ def ExecuteExecTransaction(
     data,  # Data payload
     operation,  # Operation type (0: Call, 1: Delegate)
     safeTxGas,  # Gas that should be used for the safe transaction
-    baseGas,  # Gas costs for that are independent of the transaction execution(e.g. base transaction fee, signature check, payment of the refund)
+    baseGas,  # Gas costs for that are independent of the transaction execution
     gasPrice,  # Maximum gas price that should be used for this transaction
     gasToken,  # Token address (or 0 if ETH) that is used for the payment
     refundReceiver,  # Address of receiver of gas payment (or 0 if tx.origin)

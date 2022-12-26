@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import pytest
 from brownie import accounts, reverts
 
 from web3.auto import w3

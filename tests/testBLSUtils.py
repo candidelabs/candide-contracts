@@ -5,7 +5,8 @@ from typing import Tuple
 Helper functions to use py_ecc library
 https://github.com/ethereum/py_ecc
 https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-07
-modified version of : https://github.com/ChihChengLiang/bls_solidity_python/blob/master/tests/test_bls.py
+modified version of :
+https://github.com/ChihChengLiang/bls_solidity_python/blob/master/tests/test_bls.py
 """
 
 """
@@ -31,7 +32,9 @@ aggregate signatures to one signature
 """
 
 
-def aggregate_signatures(signatures: list[Tuple[FQ, FQ, FQ]]) -> Tuple[FQ, FQ, FQ]:
+def aggregate_signatures(
+    signatures: list[Tuple[FQ, FQ, FQ]]
+) -> Tuple[FQ, FQ, FQ]:
     res = signatures[0]
     for signature in signatures[1:]:
         res = add(res, signature)
@@ -43,7 +46,9 @@ aggregate public keys to one public key
 """
 
 
-def aggregate_public_keys(pubkeys: list[Tuple[FQ2, FQ2, FQ2]]) -> Tuple[FQ2, FQ2, FQ2]:
+def aggregate_public_keys(
+    pubkeys: list[Tuple[FQ2, FQ2, FQ2]]
+) -> Tuple[FQ2, FQ2, FQ2]:
     res = pubkeys[0]
     for pubkey in pubkeys[1:]:
         res = add(res, pubkey)
@@ -73,7 +78,7 @@ def affine_to_xyz_G2(affine_G2: Tuple[int, int, int, int]):
 """
 from XYZ to Affine in G1 group
 py_ecc uses homogeneous projective coordinates
-A point (X, Y, Z) in homogeneous projective coordinates 
+A point (X, Y, Z) in homogeneous projective coordinates
 corresponds to the affine point (x, y) = (X / Z, Y / Z)
 """
 
@@ -86,7 +91,7 @@ def xyz_to_affine_G1(g1_element: Tuple[FQ, FQ, FQ]) -> Tuple[FQ, FQ]:
 """
 from XYZ to Affine in G2 group
 py_ecc uses homogeneous projective coordinates
-A point (X, Y, Z) in homogeneous projective coordinates 
+A point (X, Y, Z) in homogeneous projective coordinates
 corresponds to the affine point (x, y) = (X / Z, Y / Z)
 """
 
