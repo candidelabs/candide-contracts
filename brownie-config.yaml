@@ -2,7 +2,6 @@
 autofetch_sources: True
 dotenv: .env
 
-
 networks:
   default: development
   development:
@@ -15,10 +14,6 @@ networks:
 
   goerli-fork-dev:
     default_balance: 100000000000000000000
-
-wallets:
-  from_key: ${PRIVATE_KEY}
-
 
 # enable output of development artifacts to load with react
 dev_deployment_artifacts: true
