@@ -20,19 +20,19 @@ This repo includes the smart contracts used by Candide Wallet.
 
 # How to use this repo
 
-### Install brownie
-```
-pipx install eth-brownie
-```
-
-### Add required libraries to brownie
-```
-pipx inject eth-brownie web3 brownie-token-tester ecdsa sha3
-```
-
 ### Install Ganache
 ```
-npm install ganache
+npm install -g ganache-cli
+```
+
+### Install Poetry
+```
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+### Install dependencies
+```
+poetry install
 ```
 
 ### Add required .env variables
@@ -49,22 +49,10 @@ brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127
 ```
 brownie networks modify goerli-fork-dev explorer=https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN
 ```
-### Add libraries
-```
-brownie pm install safe-global/safe-contracts@1.3.0-libs.0
-
-brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
-```
-### Compile contracts
-```
-brownie compile
-```
-
 ## Run all tests
 ```
 brownie test --network goerli-fork-dev
 ```
-test_bundler.py will only pass if the <a href='https://github.com/candidelabs/Candide-bundler-and-paymaster-RPC'>bundler RPC</a> is running 
 
 <!-- LICENSE -->
 ## License
