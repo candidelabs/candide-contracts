@@ -42,21 +42,20 @@ cp -a .env.example .env
 
 ### Add Goerli fork to brownie networks
 ```
-brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork=https://goerli.infura.io/v3/$INFURA_API accounts=10 mnemonic=brownie port=8545
+poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork=https://goerli.infura.io/v3/$INFURA_API accounts=10 mnemonic=brownie port=8545
 ```
 
 ### Add Goerli fork configs
 ```
-brownie networks modify goerli-fork-dev explorer=https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN
+poetry run brownie networks modify goerli-fork-dev explorer=https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN
 ```
 ## Run all tests
 ```
-brownie test --network goerli-fork-dev
+poetry run brownie test --network goerli-fork-dev
 ```
 
 <!-- LICENSE -->
 ## License
-
 GNU General Public License v3.0
 
 <!-- ACKNOWLEDGMENTS -->
