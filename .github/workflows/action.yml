@@ -52,7 +52,7 @@ jobs:
         env:
           ETHERSCAN_TOKEN: ${{secrets.ETHERSCAN_TOKEN}}
           WEB3_INFURA_PROJECT_ID: ${{secrets.WEB3_INFURA_PROJECT_ID}}
-        run: 
+        run: | 
           poetry run brownie pm install safe-global/safe-contracts@1.3.0-libs.0 
           poetry run brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
           poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork=https://goerli.infura.io/v3/$env.WEB3_INFURA_PROJECT_ID accounts=10 mnemonic=brownie port=8545 
