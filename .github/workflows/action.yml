@@ -1,0 +1,62 @@
+#poetry github actions from : https://jacobian.org/til/github-actions-poetry/
+
+on: push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '14'
+      - uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+      - run: npm install -g ganache-cli
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.10.6
+
+      - name: cache poetry install
+        uses: actions/cache@v2
+        with:
+          path: ~/.local
+          key: poetry-1.1.12-0
+
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.1.12
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: cache deps
+        id: cache-deps
+        uses: actions/cache@v2
+        with:
+          path: .venv
+          key: pydeps-${{ hashFiles('**/poetry.lock') }}
+
+      - run: poetry install --no-interaction --no-root
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+
+      - run: poetry install --no-interaction
+
+      - run: poetry run brownie pm install safe-global/safe-contracts@1.3.0-libs.0 
+      - run: poetry run brownie pm install OpenZeppelin/openzeppelin-contracts@3.0.0
+      - run: poetry run brownie test --network goerli-fork-dev
+
+  super-lint:
+    name: Lint code base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run Super-Linter
+        uses: github/super-linter@v3
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
