@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 import pytest
-from brownie import accounts, reverts 
+from brownie import accounts, reverts
 
-from  testBLSUtils import *
+from testBLSUtils import *
 from web3.auto import w3
 from eth_abi.abi import encode
 
@@ -14,19 +14,21 @@ Note: py_ecc uses homogeneous projective coordinates, while blsHelper.sol uses
 Jacobian projective coordinates, so you should always converte a point to the
 affine form after processing it with py_ecc using xyz_to_affine_G1 and xyz_to_affine_G2
 """
+
+
 def test_bls_pyecc_lib(testBLS):
     """
     Test bls multisig signatures using py_ecc
     Two signers sign one message
     Aggregate both public keys and signatures
     Verify the aggregated signature with the aggregated public key
-    """ 
+    """
     secret_key1 = 123
     secret_key2 = 456
     public_key1 = get_public_key(secret_key1)
     public_key2 = get_public_key(secret_key2)
     data = encode_hex("fooooo")
-    BLS_DOMAIN = w3.solidityKeccak(['bytes'], [str.encode('eip4337.bls.domain')])
+    BLS_DOMAIN = w3.solidityKeccak(["bytes"], [str.encode("eip4337.bls.domain")])
 
     message_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, data))
     message_xyz = affine_to_xyz_G1(message_affine)
@@ -37,27 +39,28 @@ def test_bls_pyecc_lib(testBLS):
     agg_sig = aggregate_signatures([sig1, sig2])
     agg_pubkey = aggregate_public_keys([public_key1, public_key2])
 
-    assert testBLS.verifySingle(xyz_to_affine_G1(agg_sig), 
-                                xyz_to_affine_G2(agg_pubkey), 
-                                message_affine)
+    assert testBLS.verifySingle(
+        xyz_to_affine_G1(agg_sig), xyz_to_affine_G2(agg_pubkey), message_affine
+    )
+
 
 def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     """
     Test retriving public key from bls wallet instance and signing and verifying
     signatures
     """
-    #get private keys for wallet1
+    # get private keys for wallet1
     sk1w1 = bLSAccountMultisig[1][0][0]
     sk2w1 = bLSAccountMultisig[1][0][1]
-    #get private keys for wallet2
+    # get private keys for wallet2
     sk1w2 = bLSAccountMultisig[1][1][0]
     sk2w2 = bLSAccountMultisig[1][1][1]
 
-    #get Wallets instances 
+    # get Wallets instances
     wallet1 = bLSAccountMultisig[0][0]
     wallet2 = bLSAccountMultisig[0][1]
 
-    #get public keys 
+    # get public keys
     (pk1w1_int, pk2w1_int) = wallet1.getBlsPublicKeys()
     (pk1w2_int, pk2w2_int) = wallet2.getBlsPublicKeys()
     pk1w1 = affine_to_xyz_G2(pk1w1_int)
@@ -65,62 +68,73 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     pk1w2 = affine_to_xyz_G2(pk1w2_int)
     pk2w2 = affine_to_xyz_G2(pk2w2_int)
 
-    BLS_DOMAIN = bytes.fromhex(w3.solidityKeccak(['bytes32'], 
-        [str.encode('eip4337.bls.domain')]).hex()[2:])
-    
-    #multisig sign message1 using wallet1
+    BLS_DOMAIN = bytes.fromhex(
+        w3.solidityKeccak(["bytes32"], [str.encode("eip4337.bls.domain")]).hex()[2:]
+    )
+
+    # multisig sign message1 using wallet1
     m1: bytes = bytes([1, 2, 3, 4, 5])
     message1_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m1))
     message1_xyz = affine_to_xyz_G1(message1_affine)
     sig1w1 = sign(message1_xyz, sk1w1)
     sig2w1 = sign(message1_xyz, sk2w1)
 
-    #multisig sign message2 using wallet2
+    # multisig sign message2 using wallet2
     m2: bytes = bytes([1, 2, 3, 4, 5, 6, 7])
     message2_affine = tuple(testBLS.hashToPoint(BLS_DOMAIN, m2))
     message2_xyz = affine_to_xyz_G1(message2_affine)
     sig1w2 = sign(message2_xyz, sk1w2)
     sig2w2 = sign(message2_xyz, sk2w2)
 
-    #aggregate signatures to create one signature per wallet
+    # aggregate signatures to create one signature per wallet
     agg_sig_w1 = aggregate_signatures([sig1w1, sig2w1])
     agg_sig_w2 = aggregate_signatures([sig1w2, sig2w2])
     agg_sig_w1_affine = xyz_to_affine_G1(agg_sig_w1)
     agg_sig_w2_affine = xyz_to_affine_G1(agg_sig_w2)
 
-    #aggregate public keys to create one public key per wallet
+    # aggregate public keys to create one public key per wallet
     agg_pubkey_w1 = aggregate_public_keys([pk1w1, pk2w1])
     agg_pubkey_w2 = aggregate_public_keys([pk1w2, pk2w2])
     agg_pubkey_w1_xyz = xyz_to_affine_G2(agg_pubkey_w1)
     agg_pubkey_w2_xyz = xyz_to_affine_G2(agg_pubkey_w2)
 
-    #verify aggregated public key and signature per wallet for each message
+    # verify aggregated public key and signature per wallet for each message
     assert testBLS.verifySingle(agg_sig_w1_affine, agg_pubkey_w1_xyz, message1_affine)
     assert testBLS.verifySingle(agg_sig_w2_affine, agg_pubkey_w2_xyz, message2_affine)
-    
-    #aggregate the 2 wallets signatures
+
+    # aggregate the 2 wallets signatures
     agg_sig = aggregate_signatures([agg_sig_w1, agg_sig_w2])
     agg_sig_affine = xyz_to_affine_G1(agg_sig)
 
-    #verify the overall aggregated signature for both messages
-    assert testBLS.verifyMultiple(agg_sig_affine, 
-                                [agg_pubkey_w1_xyz, agg_pubkey_w2_xyz],
-                                [message1_affine, message2_affine])
+    # verify the overall aggregated signature for both messages
+    assert testBLS.verifyMultiple(
+        agg_sig_affine,
+        [agg_pubkey_w1_xyz, agg_pubkey_w2_xyz],
+        [message1_affine, message2_affine],
+    )
 
-def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccountMultisig, 
-    entryPoint, bLSMultisigSignatureAggregator, owner, accounts, receiver, testBLS):
-    #get private keys for wallet1
+
+def test_wallet_bls_aggregated_signature_through_entrypoint(
+    bLSAccountMultisig,
+    entryPoint,
+    bLSMultisigSignatureAggregator,
+    owner,
+    accounts,
+    receiver,
+    testBLS,
+):
+    # get private keys for wallet1
     sk1w1 = bLSAccountMultisig[1][0][0]
     sk2w1 = bLSAccountMultisig[1][0][1]
-    #get private keys for wallet2
+    # get private keys for wallet2
     sk1w2 = bLSAccountMultisig[1][1][0]
     sk2w2 = bLSAccountMultisig[1][1][1]
 
-    #get Wallets instances 
+    # get Wallets instances
     wallet1 = bLSAccountMultisig[0][0]
     wallet2 = bLSAccountMultisig[0][1]
 
-    #get public keys 
+    # get public keys
     (pk1w1_int, pk2w1_int) = wallet1.getBlsPublicKeys()
     (pk1w2_int, pk2w2_int) = wallet2.getBlsPublicKeys()
     pk1w1 = affine_to_xyz_G2(pk1w1_int)
@@ -128,86 +142,93 @@ def test_wallet_bls_aggregated_signature_through_entrypoint(bLSAccountMultisig,
     pk1w2 = affine_to_xyz_G2(pk1w2_int)
     pk2w2 = affine_to_xyz_G2(pk2w2_int)
 
-    #create call data from wallet1
+    # create call data from wallet1
     callData1 = wallet1.execute.encode_input(receiver, 5, "")
     op1 = [
-            wallet1.address,
-            0,
-            bytes(0),
-            callData1,
-            2150000,
-            6450000,
-            210000,
-            17530000000,
-            17530000000,
-            bytes(0),
-            (bytes(64)+ bytes([3]))
-            ]
-    
-    #get entrypoint operation hash to sign
+        wallet1.address,
+        0,
+        bytes(0),
+        callData1,
+        2150000,
+        6450000,
+        210000,
+        17530000000,
+        17530000000,
+        bytes(0),
+        (bytes(64) + bytes([3])),
+    ]
+
+    # get entrypoint operation hash to sign
     messageToSign1 = bLSMultisigSignatureAggregator.userOpToMessage(op1)
 
-    #sign entrypoint operation hash
+    # sign entrypoint operation hash
     sig1w1 = sign(affine_to_xyz_G1(messageToSign1), sk1w1)
     sig2w1 = sign(affine_to_xyz_G1(messageToSign1), sk2w1)
-    
+
     agg_pubkey_w1 = xyz_to_affine_G2(aggregate_public_keys([pk1w1, pk2w1]))
-    
+
     agg_sig_w1 = aggregate_signatures([sig1w1, sig2w1])
     agg_sig_w1_affine = xyz_to_affine_G1(agg_sig_w1)
 
-    #formate signature
-    #bitmask for signers(11 in binary = 3 decinal) 
-    op1[10] = encode(['uint256[2]'],[agg_sig_w1_affine])+ bytes([3])
-    
+    # formate signature
+    # bitmask for signers(11 in binary = 3 decinal)
+    op1[10] = encode(["uint256[2]"], [agg_sig_w1_affine]) + bytes([3])
+
     assert testBLS.verifySingle(agg_sig_w1_affine, agg_pubkey_w1, messageToSign1)
 
-    #create call data from wallet2
+    # create call data from wallet2
     callData2 = wallet2.execute.encode_input(receiver, 10, "")
     op2 = [
-            wallet2.address,
-            0,
-            bytes(0),
-            callData2,
-            2150000,
-            6450000,
-            210000,
-            17530000000,
-            17530000000,
-            bytes(0),
-            (bytes(64)+ bytes([3]))
-            ]
-    
-    #get entrypoint operation hash to sign
+        wallet2.address,
+        0,
+        bytes(0),
+        callData2,
+        2150000,
+        6450000,
+        210000,
+        17530000000,
+        17530000000,
+        bytes(0),
+        (bytes(64) + bytes([3])),
+    ]
+
+    # get entrypoint operation hash to sign
     messageToSign2 = bLSMultisigSignatureAggregator.userOpToMessage(op2)
 
-    #sign entrypoint operation hash
+    # sign entrypoint operation hash
     sig1w2 = sign(affine_to_xyz_G1(messageToSign2), sk1w2)
     sig2w2 = sign(affine_to_xyz_G1(messageToSign2), sk2w2)
-    
+
     agg_pubkey_w2 = xyz_to_affine_G2(aggregate_public_keys([pk1w2, pk2w2]))
-    
+
     agg_sig_w2 = aggregate_signatures([sig1w2, sig2w2])
     agg_sig_w2_affine = xyz_to_affine_G1(agg_sig_w2)
 
-    #formate signature    
-    #bitmask for signers(11 in binary = 3 decinal) 
-    op2[10] = encode(['uint256[2]'],[agg_sig_w2_affine])+ bytes([3])
-    
+    # formate signature
+    # bitmask for signers(11 in binary = 3 decinal)
+    op2[10] = encode(["uint256[2]"], [agg_sig_w2_affine]) + bytes([3])
+
     assert testBLS.verifySingle(agg_sig_w2_affine, agg_pubkey_w2, messageToSign2)
 
-    agg_sig_overall = '0x' + encode(['uint256[2]'],
-        [xyz_to_affine_G1(aggregate_signatures([agg_sig_w1, agg_sig_w2]))]).hex()
+    agg_sig_overall = (
+        "0x"
+        + encode(
+            ["uint256[2]"],
+            [xyz_to_affine_G1(aggregate_signatures([agg_sig_w1, agg_sig_w2]))],
+        ).hex()
+    )
 
-    #send ether to wallets
+    # send ether to wallets
     accounts[0].transfer(wallet1, "1 ether")
     accounts[0].transfer(wallet2, "1 ether")
-    
+
     beforeBalance = receiver.balance()
 
-    entryPoint.handleAggregatedOps([[[op1,op2], 
-                                    bLSMultisigSignatureAggregator.address, 
-                                    agg_sig_overall]], owner, {'from': owner})
+    entryPoint.handleAggregatedOps(
+        [[[op1, op2], bLSMultisigSignatureAggregator.address, agg_sig_overall]],
+        owner,
+        {"from": owner},
+    )
 
-    #check if the two transaction was excuted using aggregated operations
+    # check if the two transaction was excuted using aggregated operations
     assert beforeBalance + 15 == receiver.balance()
