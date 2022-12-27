@@ -37,7 +37,13 @@ poetry install
 
 ### Add required .env variables
 ```
-cp -a .env.example .env
+cp .env.example .env
+```
+
+Add your own ETHERSCAN_TOKEN, WEB3_INFURA_PROJECT_ID to .env
+
+```
+source .env
 ```
 
 ### Add Goerli fork to brownie networks
@@ -47,7 +53,7 @@ poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host
 
 ### Add Goerli fork configs
 ```
-poetry run brownie networks modify goerli-fork-dev explorer=https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN
+poetry run brownie networks modify goerli-fork-dev explorer="https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN"
 ```
 ## Run all tests
 ```
