@@ -8,14 +8,24 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../interfaces/IEntryPoint.sol";
 import "./handler/CompatibilityFallbackHandler.sol";
 
+/// @title CandideWallet - Smart contract wallet based on Gnosis safe that supports Eip4337
+/// @author CandideWallet Team
 contract CandideWallet is GnosisSafe{
     using ECDSA for bytes32;
 
+    //EIP4337 trusted entrypoint
     address public entryPoint;
 
     /// @dev Setup function sets initial storage of contract.
     /// @param _owners List of Safe owners.
     /// @param _threshold Number of required confirmations for a Safe transaction.
+    /// @param to Contract address for optional delegate call.
+    /// @param data Data payload for optional delegate call.
+    /// @param fallbackHandler Handler for fallback calls to this contract
+    /// @param paymentToken Token that should be used for the payment (0 is ETH)
+    /// @param payment Value that should be paid
+    /// @param paymentReceiver Address that should receive the payment (or 0 if tx.origin)
+    /// @param _entryPoint Address for the trusted EIP4337 entrypoint
     function setupWithEntrypoint(
         address[] calldata _owners,
         uint256 _threshold,
@@ -38,14 +48,17 @@ contract CandideWallet is GnosisSafe{
             )),
             Enum.Operation.DelegateCall, gasleft()
         );
-        //_enableModule(_entryPoint);
         ++nonce;
     }
 
+    /// @dev Called by the entrypoint to validate the user's signature and nonce
+    /// @param userOp is the entrypoint user operation
+    /// @param userOpHash is the entrypoint user operation hash
+    /// @param missingAccountFunds the minimum value this method should send the entrypoint.
+    /// this value MAY be zero, in case there is enough deposit, or the userOp has a paymaster.
     function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, 
-        address aggregator, uint256 missingAccountFunds) 
-        external returns (uint256 deadline){       
-        
+        address , uint256 missingAccountFunds) 
+        external returns (uint256){       
         if(nonce != 0){ 
             require(msg.sender == entryPoint, "account: not from entrypoint");
             
@@ -57,19 +70,21 @@ contract CandideWallet is GnosisSafe{
             ++nonce;
         }
         if (missingAccountFunds > 0) {
-            //TODO: MAY pay more than the minimum, to deposit for future transactions
             (bool success,) = payable(msg.sender).call{value : missingAccountFunds}("");
             (success);
             //ignore failure (its EntryPoint's job to verify, not account.)
         }
-        return 0;
+        return 0; //always return 0 as this function doesn't support time based validation
     }
 
-    /// @dev Allows a Module to execute a Safe transaction without any further confirmations.
+    /// @dev Allows the entrypoint to execute a transaction without any further confirmations.
     /// @param to Destination address of module transaction.
     /// @param value Ether value of module transaction.
     /// @param data Data payload of module transaction.
     /// @param operation Operation type of module transaction.
+    /// @param paymaster address.
+    /// @param approveToken token to be approved for the paymaster.
+    /// @param approveAmount token amount to be approved by the paymaster.
     function execTransactionFromEntrypoint(
         address to,
         uint256 value,
@@ -84,9 +99,18 @@ contract CandideWallet is GnosisSafe{
         // Execute transaction without further confirmations.
         execute(to, value, data, operation, gasleft());
 
+        //instead of sending a separate transaction to approve tokens
+        //for the paymaster for each transaction, it can be approved here
         if(paymaster != 0x0000000000000000000000000000000000000000){
             IERC20 token = IERC20(approveToken);
             token.approve(paymaster, approveAmount);
         }
+    }
+
+    /// @dev There should be only one verified entrypoint per chain
+    /// @dev so this function should only be used if there is a problem with
+    /// @dev the main entrypoint
+    function replaceEntrypoint(address newEntrypoint) public authorized{
+        entryPoint = newEntrypoint;
     }
 }
