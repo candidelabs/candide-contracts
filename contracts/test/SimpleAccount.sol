@@ -4,43 +4,42 @@ pragma solidity ^0.8.12;
 /// @author eth-infinitism/account-abstraction - https://github.com/eth-infinitism/account-abstraction
 /// @author modified by CandideWallet Team
 
-import "./BaseWallet.sol";
+import "./BaseAccount.sol";
+import "../../interfaces/IEntryPoint.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /**
-  * minimal wallet.
-  *  this is sample minimal wallet.
+  * minimal account.
+  *  this is sample minimal account.
   *  has execute, eth handling methods
   *  has a single signer that can send requests through the entryPoint.
   */
-contract SimpleWallet is BaseWallet {
+contract SimpleAccount is BaseAccount, UUPSUpgradeable, Initializable {
     using ECDSA for bytes32;
-    using UserOperationLib for UserOperation;
 
     //explicit sizes of nonce, to fit a single storage cell with "owner"
     uint96 private _nonce;
     address public owner;
 
-    event Test(bytes32 requestId, bytes32 hash, address owner, bytes signature);
-    event own(address owner);
     function nonce() public view virtual override returns (uint256) {
         return _nonce;
     }
 
-    function entryPoint() public view virtual override returns (EntryPoint) {
+    function entryPoint() public view virtual override returns (IEntryPoint) {
         return _entryPoint;
     }
 
-    EntryPoint private _entryPoint;
+    IEntryPoint private immutable _entryPoint;
 
-    event EntryPointChanged(address indexed oldEntryPoint, address indexed newEntryPoint);
+    event SimpleAccountInitialized(IEntryPoint indexed entryPoint, address indexed owner);
 
     // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 
-    constructor(EntryPoint anEntryPoint, address anOwner) {
+    constructor(IEntryPoint anEntryPoint) {
         _entryPoint = anEntryPoint;
-        owner = anOwner;
     }
 
     modifier onlyOwner() {
@@ -52,27 +51,27 @@ contract SimpleWallet is BaseWallet {
         //directly from EOA owner, or through the entryPoint (which gets redirected through execFromEntryPoint)
         require(msg.sender == owner || msg.sender == address(this), "only owner");
     }
-
+    
     /**
      * transfer eth value to a destination address
      */
-    function transfer(address payable dest, uint256 amount) external onlyOwner{
-        emit own(msg.sender);
-        emit own(address(this));
+    function transfer(address payable dest, uint256 amount) external onlyOwner {
         dest.transfer(amount);
     }
 
     /**
      * execute a transaction (called directly from owner, not by entryPoint)
      */
-    function exec(address dest, uint256 value, bytes calldata func) external onlyOwner {
+    function execute(address dest, uint256 value, bytes calldata func) external {
+        _requireFromEntryPointOrOwner();
         _call(dest, value, func);
     }
 
     /**
      * execute a sequence of transaction
      */
-    function execBatch(address[] calldata dest, bytes[] calldata func) external onlyOwner {
+    function executeBatch(address[] calldata dest, bytes[] calldata func) external {
+        _requireFromEntryPointOrOwner();
         require(dest.length == func.length, "wrong array lengths");
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], 0, func[i]);
@@ -81,16 +80,16 @@ contract SimpleWallet is BaseWallet {
 
     /**
      * change entry-point:
-     * a wallet must have a method for replacing the entryPoint, in case the the entryPoint is
+     * an account must have a method for replacing the entryPoint, in case the the entryPoint is
      * upgraded to a newer version.
      */
-    function _updateEntryPoint(address newEntryPoint) internal override {
-        emit EntryPointChanged(address(_entryPoint), newEntryPoint);
-        _entryPoint = EntryPoint(payable(newEntryPoint));
+    function initialize(address anOwner) public virtual initializer {
+        _initialize(anOwner);
     }
 
-    function _requireFromAdmin() internal view override {
-        _onlyOwner();
+    function _initialize(address anOwner) internal virtual {
+        owner = anOwner;
+        emit SimpleAccountInitialized(_entryPoint, owner);
     }
 
     /**
@@ -101,46 +100,43 @@ contract SimpleWallet is BaseWallet {
      * - validate current nonce matches request nonce, and increment it.
      * - pay prefund, in case current deposit is not enough
      */
-    function _requireFromEntryPoint() internal override view {
-        require(msg.sender == address(entryPoint()), "wallet: not from EntryPoint");
+    function _requireFromEntryPointOrOwner() internal view {
+        require(msg.sender == address(entryPoint()) || msg.sender == owner, "account: not Owner or EntryPoint");
     }
 
-    // called by entryPoint, only after validateUserOp succeeded.
-    function execFromEntryPoint(address dest, uint256 value, bytes calldata func) external {
-        _requireFromEntryPoint();
-        _call(dest, value, func);
-    }
-
-    /// implement template method of BaseWallet
+    /// implement template method of BaseAccount
     function _validateAndUpdateNonce(UserOperation calldata userOp) internal override {
-        require(_nonce++ == userOp.nonce, "wallet: invalid nonce");
+        require(_nonce++ == userOp.nonce, "account: invalid nonce");
     }
 
-    /// implement template method of BaseWallet
-    function _validateSignature(UserOperation calldata userOp, bytes32 requestId) internal override {
-        bytes32 hash = requestId.toEthSignedMessageHash();
-        emit Test(requestId, hash, owner, userOp.signature);
-        require(owner == hash.recover(userOp.signature), "wallet: wrong signature");
+    /// implement template method of BaseAccount
+    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash, address)
+    internal override virtual returns (uint256 deadline) {
+        bytes32 hash = userOpHash.toEthSignedMessageHash();
+        //ignore signature mismatch of from==ZERO_ADDRESS (for eth_callUserOp validation purposes)
+        // solhint-disable-next-line avoid-tx-origin
+        require(owner == hash.recover(userOp.signature) || tx.origin == address(0), "account: wrong signature");
+        return 0;
     }
 
     function _call(address target, uint256 value, bytes memory data) internal {
         (bool success, bytes memory result) = target.call{value : value}(data);
         if (!success) {
             assembly {
-                revert(add(result,32), mload(result))
+                revert(add(result, 32), mload(result))
             }
         }
     }
 
     /**
-     * check current wallet deposit in the entryPoint
+     * check current account deposit in the entryPoint
      */
     function getDeposit() public view returns (uint256) {
         return entryPoint().balanceOf(address(this));
     }
 
     /**
-     * deposit more funds for this wallet in the entryPoint
+     * deposit more funds for this account in the entryPoint
      */
     function addDeposit() public payable {
 
@@ -149,11 +145,16 @@ contract SimpleWallet is BaseWallet {
     }
 
     /**
-     * withdraw value from the wallet's deposit
+     * withdraw value from the account's deposit
      * @param withdrawAddress target to send to
      * @param amount to withdraw
      */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner{
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
         entryPoint().withdrawTo(withdrawAddress, amount);
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal view override {
+        (newImplementation);
+        _onlyOwner();
     }
 }
