@@ -48,7 +48,7 @@ source .env
 
 ### Add Goerli fork to brownie networks
 ```
-poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork=https://goerli.infura.io/v3/$WEB3_INFURA_PROJECT_ID accounts=10 mnemonic=brownie port=8545
+poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork="https://goerli.infura.io/v3/$WEB3_INFURA_PROJECT_ID" accounts=10 mnemonic=brownie port=8545
 ```
 
 ### Add Goerli fork configs
