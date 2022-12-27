@@ -10,6 +10,7 @@ interface IProxy {
 /// @title CandideWalletProxy - Generic proxy contract allows to execute all transactions applying the code of a master contract.
 /// @author Stefan George - <stefan@gnosis.io>
 /// @author Richard Meissner - <richard@gnosis.io>
+/// @author modified by CandideWallet Team
 contract CandideWalletProxy {
     // singleton always needs to be first declared variable, to ensure that it is at the same location in the contracts to which calls are delegated.
     // To reduce deployment costs this variable is internal and needs to be retrieved via `getStorageAt`
