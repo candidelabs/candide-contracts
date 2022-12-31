@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 
 import "@safe-global/safe-contracts/contracts/GnosisSafe.sol";
-import "./DefaultCallbackHandler.sol";
+import "@safe-global/safe-contracts/contracts/handler/DefaultCallbackHandler.sol";
 
 /// @title Compatibility Fallback Handler - fallback handler to provider compatibility between pre 1.3.0 and 1.3.0+ Safe contracts
 /// @author Richard Meissner - <richard@gnosis.pm>
