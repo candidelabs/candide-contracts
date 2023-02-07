@@ -16,6 +16,10 @@ contract CandideWallet is GnosisSafe{
     //EIP4337 trusted entrypoint
     address public entryPoint;
 
+    //return value in case of signature failure, with no time-range.
+    // equivalent to packSigTimeRange(true,0,0);
+    uint256 constant internal SIG_VALIDATION_FAILED = 1;
+
     /// @dev Setup function sets initial storage of contract.
     /// @param _owners List of Safe owners.
     /// @param _threshold Number of required confirmations for a Safe transaction.
@@ -57,24 +61,23 @@ contract CandideWallet is GnosisSafe{
     /// @param missingAccountFunds the minimum value this method should send the entrypoint.
     /// this value MAY be zero, in case there is enough deposit, or the userOp has a paymaster.
     function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, 
-        address , uint256 missingAccountFunds) 
-        external returns (uint256){       
-        if(nonce != 0){ 
+        address , uint256 missingAccountFunds) external returns (uint256 sigTimeRange){       
+        if(userOp.initCode.length == 0){
             require(msg.sender == entryPoint, "account: not from entrypoint");
-            
-            bytes32 hash = userOpHash.toEthSignedMessageHash();
-            checkNSignatures(hash, bytes(abi.encode(userOp)), userOp.signature, threshold);
-            if (userOp.initCode.length == 0) {
-                require(nonce == userOp.nonce, "account: invalid nonce");
+            bytes32 messageHash = userOpHash.toEthSignedMessageHash();
+
+            try this.checkNSignatures(messageHash, bytes(abi.encode(userOp)), 
+                userOp.signature, threshold){
+               require(nonce++ == userOp.nonce, "account: invalid nonce");
+            } catch {
+                sigTimeRange = SIG_VALIDATION_FAILED;              
             }
-            ++nonce;
         }
         if (missingAccountFunds > 0) {
-            (bool success,) = payable(msg.sender).call{value : missingAccountFunds}("");
+            (bool success,) = payable(msg.sender).call{value : missingAccountFunds, gas : type(uint256).max}("");
             (success);
             //ignore failure (its EntryPoint's job to verify, not account.)
         }
-        return 0; //always return 0 as this function doesn't support time based validation
     }
 
     /// @dev Allows the entrypoint to execute a transaction without any further confirmations.
