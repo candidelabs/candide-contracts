@@ -8,7 +8,6 @@ import eth_abi
 from testUtils import (
     ExecuteExecTransaction,
     ExecuteEntryPointHandleOps,
-    ExecuteSocialRecoveryOperation,
 )
 
 
@@ -192,7 +191,6 @@ def test_transfer_from_entrypoint_with_init(
     notOwner,
     entryPoint,
     accounts,
-    friends,
 ):
     """
     Call entrypoint with initdata to create a candideWalletProxy then send eth
