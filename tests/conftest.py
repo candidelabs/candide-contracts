@@ -63,19 +63,6 @@ def receiver(accounts):
 
 
 @pytest.fixture(scope="module")
-def friends(accounts):
-    """
-    Friends for social recovery
-    """
-    friends = []
-    accounts.add()
-    friends.append(accounts[-1])
-    accounts.add()
-    friends.append(accounts[-1])
-    return friends
-
-
-@pytest.fixture(scope="module")
 def entryPoint(Contract):
     """
     Fetch EntryPoint Contract from the specified address
@@ -101,14 +88,6 @@ def simpleWallet(SimpleAccount, entryPoint, owner):
     sw = SimpleAccount.deploy(entryPoint.address, {"from": owner})
     sw.initialize(owner.address, {"from": owner})
     return sw
-
-
-@pytest.fixture(scope="module")
-def socialRecoveryModule(SocialRecoveryModule, owner):
-    """
-    Deploy EIP4337Manager contract
-    """
-    return SocialRecoveryModule.deploy({"from": owner})
 
 
 @pytest.fixture(scope="module")
