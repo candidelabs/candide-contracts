@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@safe-global/safe-contracts/contracts/GnosisSafe.sol";
+import "@safe-global/safe-contracts/contracts/Safe.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -10,7 +10,7 @@ import "./handler/CompatibilityFallbackHandler.sol";
 
 /// @title CandideWallet - Smart contract wallet based on Gnosis safe that supports Eip4337
 /// @author CandideWallet Team
-contract CandideWallet is GnosisSafe{
+contract CandideWallet is Safe{
     using ECDSA for bytes32;
 
     //EIP4337 trusted entrypoint
@@ -44,13 +44,13 @@ contract CandideWallet is GnosisSafe{
         entryPoint = _entryPoint;
         
         execute(address(this), 0, 
-            abi.encodeCall(GnosisSafe.setup, (
+            abi.encodeCall(Safe.setup, (
                 _owners, _threshold,
                 to, data,
                 fallbackHandler,paymentToken, 
                 payment, paymentReceiver 
             )),
-            Enum.Operation.DelegateCall, gasleft()
+            Enum.Operation.DelegateCall, type(uint256).max
         );
         ++nonce;
     }
@@ -100,7 +100,7 @@ contract CandideWallet is GnosisSafe{
         // Only Entrypoint is allowed.
         require(msg.sender == entryPoint, "Not from entrypoint");
         // Execute transaction without further confirmations.
-        execute(to, value, data, operation, gasleft());
+        execute(to, value, data, operation, type(uint256).max);
 
         //instead of sending a separate transaction to approve tokens
         //for the paymaster for each transaction, it can be approved here

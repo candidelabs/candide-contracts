@@ -3,7 +3,7 @@ pragma solidity ^0.8.12;
 
 import "./storage/IGuardianStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
+import "@safe-global/safe-contracts/contracts/Safe.sol";
 
 /// @title Social Recovery Module
 /// @author CANDIDE Labs
@@ -241,7 +241,7 @@ contract SocialRecoveryModule {
         uint256 newThreshold = request.newThreshold;
         delete recoveryRequests[_wallet];
 
-        GnosisSafe safe = GnosisSafe(payable(_wallet));
+        Safe safe = Safe(payable(_wallet));
         address[] memory owners = safe.getOwners();
 
         for (uint256 i = (owners.length - 1); i > 0; --i) {

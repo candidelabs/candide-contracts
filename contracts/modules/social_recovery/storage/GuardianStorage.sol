@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import "./IGuardianStorage.sol";
-import "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
+import "@safe-global/safe-contracts/contracts/Safe.sol";
 
 /**
  * @title GuardianStorage
@@ -31,7 +31,7 @@ contract GuardianStorage is IGuardianStorage {
      */
     modifier onlyModule(address _wallet) {
         // solhint-disable-next-line reason-string
-        require(GnosisSafe(payable(_wallet)).isModuleEnabled(msg.sender), "GS: methold only callable by an enabled module");
+        require(Safe(payable(_wallet)).isModuleEnabled(msg.sender), "GS: methold only callable by an enabled module");
         _;
     }
 
@@ -42,7 +42,7 @@ contract GuardianStorage is IGuardianStorage {
      */
     function addGuardian(address _wallet, address _guardian) external onlyModule(_wallet) {
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS && _guardian != _wallet, "GS: invalid guardian");
-        require(!GnosisSafe(payable(_wallet)).isOwner(_guardian), "GS: guardian cannot be an owner");
+        require(!Safe(payable(_wallet)).isOwner(_guardian), "GS: guardian cannot be an owner");
         GuardianStorageEntry storage entry = entries[_wallet];
         require(entry.guardians[_guardian] == address(0), "GS: duplicate guardian");
         if (entry.count == 0){
