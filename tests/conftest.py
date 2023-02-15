@@ -19,7 +19,7 @@ import random
 from py_ecc.optimized_bn128.optimized_curve import curve_order
 from testBLSUtils import get_public_key, xyz_to_affine_G2
 
-entryPoint_addr = "0xbdb76d21d9C1db55F0a37C9D26fe8C4aCD7e4D5e"  # Goerli
+entryPoint_addr = "0x0576a174D229E3cFA37253523E645A78A0C91B57"  # Goerli
 # entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
 SingletonFactory_add = "0xce0042B868300000d44A59004Da54A005ffdcf9f"
 # should be the same as the bundler's RPC
