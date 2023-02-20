@@ -39,6 +39,7 @@ def owner(accounts):
     accounts.add()
     return accounts[-1]
 
+
 @pytest.fixture(scope="module")
 def erc1271Owner(accounts):
     """
@@ -46,6 +47,7 @@ def erc1271Owner(accounts):
     """
     accounts.add()
     return accounts[-1]
+
 
 @pytest.fixture(scope="module")
 def notOwner(accounts):
@@ -99,17 +101,24 @@ def simpleWallet(SimpleAccount, entryPoint, owner):
     sw.initialize(owner.address, {"from": owner})
     return sw
 
+
 @pytest.fixture(scope="module")
 def socialRecoveryModule(SocialRecoveryModule, GuardianStorage, accounts):
     """
     Deploy EIP4337Manager contract
     """
-    guardianStorage = GuardianStorage.deploy({'from': accounts[0]})
-    return SocialRecoveryModule.deploy(guardianStorage, 1000, {"from": accounts[0]})
+    guardianStorage = GuardianStorage.deploy({"from": accounts[0]})
+    return SocialRecoveryModule.deploy(
+        guardianStorage, 1000, {"from": accounts[0]}
+    )
+
 
 @pytest.fixture(scope="module")
 def erc1271Wallet(ERC1271WalletMock, erc1271Owner, accounts):
-    return ERC1271WalletMock.deploy(erc1271Owner.address, {"from": accounts[0]})
+    return ERC1271WalletMock.deploy(
+        erc1271Owner.address, {"from": accounts[0]}
+    )
+
 
 @pytest.fixture(scope="module")
 def candideWalletSingleton(owner):
