@@ -54,9 +54,9 @@ def ExecuteExecTransaction(
 
 
 def ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler):
-    requestId = entryPoint.getUserOpHash(op)
+    userOpHash = entryPoint.getUserOpHash(op)
     ownerSigner = w3.eth.account.from_key(owner.private_key)
-    message_hash = defunct_hash_message(requestId)
+    message_hash = defunct_hash_message(userOpHash)
     sig = ownerSigner.signHash(
         message_hash
     )  # proxy owner should sign the entrypoint operation

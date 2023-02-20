@@ -53,9 +53,9 @@ def test_owner_can_call_transfer_eth_through_entrypoint(
         bytes(0),
         bytes(0),
     ]
-    requestId = entryPoint.getUserOpHash(op)
+    userOpHash = entryPoint.getUserOpHash(op)
     ownerSigner = w3.eth.account.from_key(owner.private_key)
-    message_hash = defunct_hash_message(requestId)
+    message_hash = defunct_hash_message(userOpHash)
     sig = ownerSigner.signHash(message_hash)
     op[10] = sig.signature
     entryPoint.handleOps([op], owner, {"from": owner})
