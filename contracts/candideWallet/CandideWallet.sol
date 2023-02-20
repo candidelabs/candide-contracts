@@ -61,7 +61,7 @@ contract CandideWallet is Safe{
     /// @param missingAccountFunds the minimum value this method should send the entrypoint.
     /// this value MAY be zero, in case there is enough deposit, or the userOp has a paymaster.
     function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, 
-        address , uint256 missingAccountFunds) external returns (uint256 sigTimeRange){       
+        uint256 missingAccountFunds) external returns (uint256 sigTimeRange){       
         if(userOp.initCode.length == 0){
             require(msg.sender == entryPoint, "account: not from entrypoint");
             bytes32 messageHash = userOpHash.toEthSignedMessageHash();
