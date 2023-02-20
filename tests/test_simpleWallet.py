@@ -18,7 +18,7 @@ def test_owner_can_transfer(simpleWallet, owner):
     Check if the owner can transfer
     """
     accounts[0].transfer(simpleWallet.address, "2 ether")
-    simpleWallet.transfer(accounts[1], "1 ether", {"from": owner})
+    simpleWallet.execute(accounts[1], "1 ether", bytes(0), {"from": owner})
 
 
 def test_others_can_not_transfer(simpleWallet):
@@ -27,7 +27,9 @@ def test_others_can_not_transfer(simpleWallet):
     """
     accounts[0].transfer(simpleWallet.address, "2 ether")
     with reverts():
-        simpleWallet.transfer(accounts[1], "1 ether", {"from": accounts[0]})
+        simpleWallet.execute(
+            accounts[1], "1 ether", bytes(0), {"from": accounts[0]}
+        )
 
 
 def test_owner_can_call_transfer_eth_through_entrypoint(
@@ -39,7 +41,7 @@ def test_owner_can_call_transfer_eth_through_entrypoint(
 
     accounts[0].transfer(simpleWallet, "1 ether")
     beforeBalance = accounts[1].balance()
-    callData = simpleWallet.execute.encode_input(accounts[1], 5, "")
+    callData = simpleWallet.execute.encode_input(accounts[1], 5, bytes(0))
     op = [
         simpleWallet.address,
         0,
