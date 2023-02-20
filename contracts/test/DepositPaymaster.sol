@@ -4,16 +4,22 @@ pragma solidity ^0.8.12;
 /// @author eth-infinitism/account-abstraction - https://github.com/eth-infinitism/account-abstraction
 /// @author modified by CandideWallet Team
 
+// import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// import "@openzeppelin/contracts/access/Ownable.sol";
+// import "@account-abstraction/contracts/core/BasePaymaster.sol";
+// import "@account-abstraction/contracts/test/TestOracle.sol";
+// import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "../paymaster/BasePaymaster.sol";
-import "../../interfaces/IOracle.sol";
-import "../../interfaces/IEntryPoint.sol";
+import "@account-abstraction/contracts/core/BasePaymaster.sol";
+import "@account-abstraction/contracts/samples/IOracle.sol";
 
 /**
- * A token-based paymaster that accepts token deposit
+ * A token-based paymaster that accepts token deposits
  * The deposit is only a safeguard: the user pays with his token balance.
  *  only if the user didn't approve() the paymaster, or if the token balance is not enough, the deposit will be used.
  *  thus the required deposit is to cover just one method call.
@@ -48,7 +54,7 @@ contract DepositPaymaster is BasePaymaster {
      * owner of the paymaster should add supported tokens
      */
     function addToken(IERC20 token, IOracle tokenPriceOracle) external onlyOwner {
-        require(oracles[token] == NULL_ORACLE);
+        require(oracles[token] == NULL_ORACLE, "Token already set");
         oracles[token] = tokenPriceOracle;
     }
 
@@ -72,6 +78,10 @@ contract DepositPaymaster is BasePaymaster {
         }
     }
 
+    /**
+     * @return amount - the amount of given token deposited to the Paymaster.
+     * @return _unlockBlock - the block height at which the deposit can be withdrawn.
+     */
     function depositInfo(IERC20 token, address account) public view returns (uint256 amount, uint256 _unlockBlock) {
         amount = balances[token][account];
         _unlockBlock = unlockBlock[account];
@@ -124,8 +134,8 @@ contract DepositPaymaster is BasePaymaster {
      * Note that the sender's balance is not checked. If it fails to pay from its balance,
      * this deposit will be used to compensate the paymaster for the transaction.
      */
-    function validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
-    external view override returns (bytes memory context, uint256 deadline) {
+    function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
+    internal view override returns (bytes memory context, uint256 validationData) {
 
         (userOpHash);
         // verificationGasLimit is dual-purposed, as gas limit for postOp. make sure it is high enough

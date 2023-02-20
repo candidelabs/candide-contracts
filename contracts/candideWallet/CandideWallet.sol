@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@safe-global/safe-contracts/contracts/Safe.sol";
+import "@safe-contracts/contracts/Safe.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "../../interfaces/IEntryPoint.sol";
-import "./handler/CompatibilityFallbackHandler.sol";
+import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import "@safe-contracts/contracts/handler/CompatibilityFallbackHandler.sol";
 
 /// @title CandideWallet - Smart contract wallet based on Gnosis safe that supports Eip4337
 /// @author CandideWallet Team

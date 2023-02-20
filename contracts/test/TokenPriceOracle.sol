@@ -3,7 +3,7 @@ pragma solidity ^0.8.12;
 
 /// @author CandideWallet Team
 
-import "../../interfaces/IOracle.sol";
+import "@account-abstraction/contracts/samples/IOracle.sol";
 
 contract TokenPriceOracle is IOracle{
 

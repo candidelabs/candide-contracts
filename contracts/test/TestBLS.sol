@@ -3,7 +3,7 @@ pragma solidity ^0.8.12;
 
 /// @author CandideWallet Team
 
-import {BLS} from "../candideWallet/bls/lib/hubble-contracts/contracts/libs/BLS.sol";
+import {BLS} from "@account-abstraction/contracts/samples/bls/lib/hubble-contracts/contracts/libs/BLS.sol";
 
 contract TestBLS{
 

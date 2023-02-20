@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import "./IGuardianStorage.sol";
-import "@safe-global/safe-contracts/contracts/Safe.sol";
+import "@safe-contracts/contracts/Safe.sol";
 
 /**
  * @title GuardianStorage

@@ -3,8 +3,8 @@ pragma solidity ^0.8.12;
 
 /// @author CandideWallet Team
 
-import "./BasePaymaster.sol";
-import "../../interfaces/IEntryPoint.sol";
+import "@account-abstraction/contracts/core/BasePaymaster.sol";
+import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -83,8 +83,8 @@ contract CandidePaymaster is BasePaymaster {
      *total paymasterData length equal 124 or 125
      */
 
-    function validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
-    external returns (bytes memory context, uint256 deadline){
+    function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
+    internal virtual override returns (bytes memory context, uint256 validationData){
 
         uint256 paymasterDataLength = userOp.paymasterAndData.length - 20;
 

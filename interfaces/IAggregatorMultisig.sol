@@ -4,7 +4,7 @@ pragma solidity ^0.8.12;
 /// @author eth-infinitism/account-abstraction - https://github.com/eth-infinitism/account-abstraction
 /// @author modified by CandideWallet Team
 
-import "./UserOperation.sol";
+import "@account-abstraction/contracts/interfaces/UserOperation.sol";
 
 /**
  * Aggregated Signatures validator for multisig BLS.

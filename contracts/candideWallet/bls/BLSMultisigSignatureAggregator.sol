@@ -3,10 +3,10 @@ pragma solidity >=0.8.4 <0.9.0;
 pragma abicoder v2;
 
 import "../../../interfaces/IAggregatorMultisig.sol";
-import "../../../interfaces/IEntryPoint.sol";
-import {BLSOpen} from  "./lib/BLSOpen.sol";
+import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {BLSOpen} from  "@account-abstraction/contracts/samples/bls/lib/BLSOpen.sol";
 import "../../../interfaces/IBLSAccountMultisig.sol";
-import "./BLSHelper.sol";
+import "@account-abstraction/contracts/samples/bls/BLSHelper.sol";
 import "./BLSHelperG2.sol";
 
 /**

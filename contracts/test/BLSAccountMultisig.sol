@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.12;
 
-import "./SimpleAccount.sol";
+import "@account-abstraction/contracts/samples/SimpleAccount.sol";
 import "../../interfaces/IBLSAccountMultisig.sol";
 import "../../interfaces/IAggregatorMultisig.sol";
 /**
@@ -30,13 +30,13 @@ contract BLSAccountMultisig is SimpleAccount, IBLSAccountMultisig {
         threshold = aThreshold;
     }
 
-    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash, address userOpAggregator)
-    internal override view returns (uint256 deadline) {
+    // function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
+    // internal override view returns (uint256 deadline) {
 
-        (userOp, userOpHash);
-        require(userOpAggregator == aggregator, "BLSAccount: wrong aggregator");
-        return 0;
-    }
+    //     (userOp, userOpHash);
+    //     require(userOpAggregator == aggregator, "BLSAccount: wrong aggregator");
+    //     return 0;
+    // }
 
     event PublicKeyChanged(uint256[4][] oldPublicKey, uint256[4][] newPublicKey);
 

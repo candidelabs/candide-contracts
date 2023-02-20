@@ -4,7 +4,7 @@ pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-import "../../interfaces/IEntryPoint.sol";
+import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import "./BLSAccountMultisig.sol";
 
 /// @author eth-infinitism/account-abstraction - https://github.com/eth-infinitism/account-abstraction

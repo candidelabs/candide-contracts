@@ -3,7 +3,7 @@ pragma solidity ^0.8.12;
 
 import "./storage/IGuardianStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import "@safe-global/safe-contracts/contracts/Safe.sol";
+import "@safe-contracts/contracts/Safe.sol";
 
 /// @title Social Recovery Module
 /// @author CANDIDE Labs
