@@ -20,8 +20,7 @@ This repo includes the smart contracts used by Candide Wallet.
 
 # Account Recovery
 
-*In this section, we highlight and explain the [SocialRecoveryModule.sol](../CandideWalletContracts/contracts/modules/social_recovery/SocialRecoveryModule.sol) contract.*
-
+*In this section, we highlight and explain the [SocialRecoveryModule.sol](./contracts/modules/social_recovery/SocialRecoveryModule.sol) contract.*
 
 The Account Recovery module is designed to work for both a single-owner account and an n-m multi-sig account. In the case of the single-owner account, the signer key is typically stored on the user's device. More specifically, owners can add recovery methods (also known as Guardians) to change the ownership of the account, in case their signer key is lost or compromised.
 
