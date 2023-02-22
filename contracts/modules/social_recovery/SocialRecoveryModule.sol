@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.12;
+pragma solidity >=0.8.12 <0.9.0;
 
 import "./storage/IGuardianStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
