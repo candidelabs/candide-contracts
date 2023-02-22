@@ -59,6 +59,10 @@ We assume that the signer key belongs to its real owner. The probability of the 
 
 # Development
 
+### Fetch submodules
+```
+git submodule update --init --force --remote
+```
 ### Install Ganache
 ```
 npm install -g ganache-cli
