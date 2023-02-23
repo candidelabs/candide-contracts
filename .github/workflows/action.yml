@@ -21,9 +21,9 @@ jobs:
           python-version: 3.10.6
       
       - name: checkout all the submodules
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          submodules: recursive
+          submodules: true
 
       - name: cache poetry install
         uses: actions/cache@v2
