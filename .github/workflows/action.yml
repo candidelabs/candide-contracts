@@ -24,7 +24,7 @@ jobs:
       - name: Checkout submodules
         shell: bash
         run: |
-          git submodule update --force --recursive --init --remote
+          git submodule update --recursive --init --remote
 
       - name: cache poetry install
         uses: actions/cache@v2
