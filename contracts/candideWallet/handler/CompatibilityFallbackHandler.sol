@@ -3,11 +3,11 @@ pragma solidity ^0.8.10;
 
 
 import "@safe-contracts/contracts/Safe.sol";
-import "@safe-contracts/contracts/handler/DefaultCallbackHandler.sol";
+import "@safe-contracts/contracts/handler/TokenCallbackHandler.sol";
 
 /// @title Compatibility Fallback Handler - fallback handler to provider compatibility between pre 1.3.0 and 1.3.0+ Safe contracts
 /// @author Richard Meissner - <richard@gnosis.pm>
-contract CompatibilityFallbackHandler is DefaultCallbackHandler, ISignatureValidator {
+contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidator {
     //keccak256(
     //    "SafeMessage(bytes message)"
     //);
