@@ -20,10 +20,13 @@ jobs:
         with:
           python-version: 3.10.6
       
-      - name: checkout all the submodules
-        uses: actions/checkout@v3
-        with:
-          submodules: true
+      - uses: actions/checkout@v3 
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+          git submodule sync --recursive
+          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
 
       - name: cache poetry install
         uses: actions/cache@v2
