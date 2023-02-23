@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from brownie import reverts, CandideWalletProxy, chain
+from brownie import reverts, chain
 from eth_account import Account
 from testUtils import ExecuteExecTransaction, ExecuteSocialRecoveryOperation
 
@@ -487,7 +487,7 @@ def test_multiConfirmRecovery(
             signatures,
             False,
         )
-    # Revert if owner tried to cancel a recovery request while no recovery 
+    # Revert if owner tried to cancel a recovery request while no recovery
     # request exists on chain
     cancelRecoveryCallData = socialRecoveryModule.cancelRecovery.encode_input(
         candideWalletProxy.address
@@ -552,7 +552,7 @@ def test_multiConfirmRecovery(
     ]
     signatures.sort(key=lambda x: int(x[0], 16))
 
-    # Revert if creating recovery request with a null signature while 
+    # Revert if creating recovery request with a null signature while
     # sender is not guardian
     with reverts():
         socialRecoveryModule.multiConfirmRecovery(
@@ -564,7 +564,8 @@ def test_multiConfirmRecovery(
             {"from": accounts[0]},
         )
 
-    # Inititate recovery request with supplied null signature if sender is guardian
+    # Inititate recovery request with supplied null
+    # signature if sender is guardian
     firstGuardianAccount = accounts.add(private_key=firstGuardian.privateKey)
     socialRecoveryModule.multiConfirmRecovery(
         candideWalletProxy.address,
@@ -591,7 +592,7 @@ def test_multiConfirmRecovery(
     ]
     signatures.sort(key=lambda x: int(x[0], 16))
 
-    # Revert because we need at least 3 signatures to replace previous 
+    # Revert because we need at least 3 signatures to replace previous
     # request (because it was only 2 sigs)
     with reverts():
         socialRecoveryModule.multiConfirmRecovery(
@@ -829,7 +830,8 @@ def test_confirmRecovery(
     assert approvals == 1
     assert recoveryRequest[2] == 0
 
-    # multiple confirmRecovery transactions by same guardian won't increase approvals
+    # multiple confirmRecovery transactions by same guardian
+    # won't increase approvals
     socialRecoveryModule.confirmRecovery(
         candideWalletProxy.address,
         [newOwner1.address],
@@ -919,7 +921,8 @@ def test_confirmRecovery(
         {"from": firstGuardianAccount},
     )
 
-    # Revert because we need at least 3 signatures to replace previous request (because it was only 2 sigs)
+    # Revert because we need at least 3 signatures to replace
+    # previous request (because it was only 2 sigs)
     with reverts():
         socialRecoveryModule.confirmRecovery(
             candideWalletProxy.address,

@@ -9,9 +9,6 @@ from brownie import (
     BLSOpen,
     TestBLS,
     BLSAccountMultisig,
-    SocialRecoveryModule,
-    GuardianStorage,
-    ERC1271WalletMock,
 )
 from brownie_tokens import ERC20
 import json

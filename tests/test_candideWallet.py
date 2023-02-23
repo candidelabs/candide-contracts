@@ -2,8 +2,6 @@
 
 from brownie import Contract, reverts, CandideWalletProxy
 from web3.auto import w3
-from eth_account import Account, messages
-from hexbytes import HexBytes
 import eth_abi
 from testUtils import (
     ExecuteExecTransaction,
