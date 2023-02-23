@@ -487,7 +487,8 @@ def test_multiConfirmRecovery(
             signatures,
             False,
         )
-    # Revert if owner tried to cancel a recovery request while no recovery request exists on chain
+    # Revert if owner tried to cancel a recovery request while no recovery 
+    # request exists on chain
     cancelRecoveryCallData = socialRecoveryModule.cancelRecovery.encode_input(
         candideWalletProxy.address
     )
@@ -551,7 +552,8 @@ def test_multiConfirmRecovery(
     ]
     signatures.sort(key=lambda x: int(x[0], 16))
 
-    # Revert if creating recovery request with a null signature while sender is not guardian
+    # Revert if creating recovery request with a null signature while 
+    # sender is not guardian
     with reverts():
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
@@ -589,7 +591,8 @@ def test_multiConfirmRecovery(
     ]
     signatures.sort(key=lambda x: int(x[0], 16))
 
-    # Revert because we need at least 3 signatures to replace previous request (because it was only 2 sigs)
+    # Revert because we need at least 3 signatures to replace previous 
+    # request (because it was only 2 sigs)
     with reverts():
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
@@ -744,7 +747,7 @@ def test_confirmRecovery(
 
     newOwner1 = Account.create()
     newOwner2 = Account.create()
-    newOwner3 = Account.create()
+    # newOwner3 = Account.create()
 
     # Add first guardian
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
@@ -955,7 +958,7 @@ def test_multiAndSingleRecovery(
     candideWalletProxy, owner, accounts, socialRecoveryModule
 ):
     firstGuardian = Account.create()
-    firstGuardianAccount = accounts.add(private_key=firstGuardian.privateKey)
+    # firstGuardianAccount = accounts.add(private_key=firstGuardian.privateKey)
     secondGuardian = Account.create()
     secondGuardianAccount = accounts.add(private_key=secondGuardian.privateKey)
     thirdGuardian = Account.create()
@@ -984,7 +987,7 @@ def test_multiAndSingleRecovery(
 
     newOwner1 = Account.create()
     newOwner2 = Account.create()
-    newOwner3 = Account.create()
+    # newOwner3 = Account.create()
 
     # Add first guardian
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
