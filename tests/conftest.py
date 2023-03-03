@@ -5,6 +5,7 @@ from brownie import (
     Contract,
     CandideWallet,
     CandideWalletProxy,
+    CandideProxyFactory,
     BLSAccount,
     BLSOpen,
     TestBLS,
@@ -18,7 +19,6 @@ from testBLSUtils import get_public_key, xyz_to_affine_G2
 
 entryPoint_addr = "0x0576a174D229E3cFA37253523E645A78A0C91B57"  # Goerli
 # entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
-SingletonFactory_add = "0xce0042B868300000d44A59004Da54A005ffdcf9f"
 # should be the same as the bundler's RPC
 bundler_pk = "e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4"  # noqa: E501
 
@@ -82,11 +82,8 @@ def entryPoint(Contract):
 
 
 @pytest.fixture(scope="module")
-def singletonFactory(Contract):
-    """
-    Fetch EntryPoint Contract from the specified address
-    """
-    return Contract.from_explorer(SingletonFactory_add)
+def candideProxyFactory(accounts):
+    return CandideProxyFactory.deploy({"from": accounts[0]})
 
 
 @pytest.fixture(scope="module")
