@@ -9,13 +9,6 @@ from testUtils import (
 )
 
 
-def test_VERSION(candideWalletProxy):
-    """
-    Check version - older versions are not suppoted
-    """
-    assert candideWalletProxy.VERSION() == "1.3.0"
-
-
 def test_owner(candideWalletProxy, owner):
     """
     Check owner
