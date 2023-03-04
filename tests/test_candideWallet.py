@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-from brownie import Contract, reverts, CandideWalletProxy
+from brownie import reverts
 from web3.auto import w3
-import eth_abi
+from eth_abi.packed import encode_packed
 from testUtils import (
     ExecuteExecTransaction,
     ExecuteEntryPointHandleOps,
@@ -182,7 +182,7 @@ def test_transaction_through_entrypoint(
 def test_transfer_from_entrypoint_with_init(
     candideWalletProxy,
     candideWalletSingleton,
-    singletonFactory,
+    candideProxyFactory,
     owner,
     bundler,
     receiver,
@@ -197,34 +197,7 @@ def test_transfer_from_entrypoint_with_init(
 
     # initCode for deploying a new candideWalletProxy
     # contract by the entrypoint
-    walletProxyBytecode = CandideWalletProxy.bytecode
-    walletProxyArgsEncoded = eth_abi.encode(
-        ["address"], [candideWalletSingleton.address]
-    ).hex()
-
-    # calculate proxy address
-    ff = bytes.fromhex("ff")
-    proxyInit = walletProxyBytecode + walletProxyArgsEncoded
-    proxyInitHash = w3.solidityKeccak(["bytes"], ["0x" + proxyInit])
-    c2Nonce = 0
-    proxyAdd = w3.solidityKeccak(
-        ["bytes1", "address", "uint256", "bytes"],
-        [ff, singletonFactory.address, c2Nonce, proxyInitHash],
-    )[-20:].hex()
-
-    # send eth to the candideWalletProxy Contract address
-    # before deploying the candideWalletProxy contract
-    accounts[0].transfer(proxyAdd, "1.05 ether")
-
-    initCode = (
-        singletonFactory.address[2:]
-        + singletonFactory.deploy.encode_input(
-            walletProxyBytecode + walletProxyArgsEncoded, 0
-        )[2:]
-    )
-    # create callData to be executed by the candideWalletProxy contract
-
-    callData = candideWalletProxy.setupWithEntrypoint.encode_input(
+    initializerData = candideWalletProxy.setupWithEntrypoint.encode_input(
         [owner.address],
         1,
         "0x0000000000000000000000000000000000000000",
@@ -235,29 +208,36 @@ def test_transfer_from_entrypoint_with_init(
         "0x0000000000000000000000000000000000000000",
         entryPoint.address,
     )
-
-    # create entrypoint operation
-    op = [
-        proxyAdd,
-        0,
-        initCode,
-        callData,
-        215000,
-        645000,
-        21000,
-        1000000,
-        1000000,
-        bytes(0),
-        bytes(0),
-    ]
-
-    ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
-
-    candideWalletInit = Contract.from_abi(
-        "CandideWallet", proxyAdd, candideWalletSingleton.abi
+    c2Nonce = 0
+    salt = w3.keccak(
+        hexstr=encode_packed(
+            ["bytes32", "uint256"],
+            [w3.keccak(hexstr=initializerData), c2Nonce]
+        ).hex()
     )
+    walletProxyBytecode = candideProxyFactory.proxyCreationCode()
 
-    callData = candideWalletInit.execTransactionFromEntrypoint.encode_input(
+    # calculate proxy address
+    ff = bytes.fromhex("ff")
+    initHash = w3.keccak(hexstr=encode_packed(
+        ["bytes", "uint256"],
+        [walletProxyBytecode, int(candideWalletSingleton.address, 16)]
+    ).hex())
+    proxyAdd = w3.solidityKeccak(
+        ["bytes1", "address", "bytes32", "bytes32"],
+        [ff, candideProxyFactory.address, salt, initHash],
+    )[-20:].hex()
+
+    # send eth to the candideWalletProxy Contract address
+    # before deploying the candideWalletProxy contract
+    accounts[0].transfer(proxyAdd, "1.05 ether")
+
+    initCode = candideProxyFactory.address[2:] + \
+        candideProxyFactory.createProxyWithNonce.encode_input(
+            candideWalletSingleton.address, initializerData, c2Nonce
+        )[2:]
+
+    callData = candideWalletProxy.execTransactionFromEntrypoint.encode_input(
         receiver.address,
         5,
         "0x",
@@ -269,8 +249,8 @@ def test_transfer_from_entrypoint_with_init(
 
     op = [
         proxyAdd,
-        candideWalletInit.nonce(),
-        bytes(0),
+        0,
+        initCode,
         callData,
         215000,
         645000,
