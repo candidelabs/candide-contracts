@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import "@safe-contracts/contracts/handler/CompatibilityFallbackHandler.sol";
+import "../utils/Exec.sol";
 
 /// @title CandideWallet - Smart contract wallet based on Gnosis safe that supports Eip4337
 /// @author CandideWallet Team
@@ -39,19 +40,20 @@ contract CandideWallet is Safe{
         uint256 payment,
         address payable paymentReceiver,
         address _entryPoint
-    ) external{
+    ) external {
         entryPoint = _entryPoint;
-        
-        execute(address(this), 0, 
+
+        _executeAndRevert(
+            address(this),
+            0,
             abi.encodeCall(Safe.setup, (
                 _owners, _threshold,
                 to, data,
-                fallbackHandler,paymentToken, 
-                payment, paymentReceiver 
+                fallbackHandler,paymentToken,
+                payment, paymentReceiver
             )),
-            Enum.Operation.DelegateCall, type(uint256).max
+            Enum.Operation.DelegateCall
         );
-        ++nonce;
     }
 
     /// @dev Called by the entrypoint to validate the user's signature and nonce
@@ -61,20 +63,43 @@ contract CandideWallet is Safe{
     /// this value MAY be zero, in case there is enough deposit, or the userOp has a paymaster.
     /// @return validationData returns SIG_VALIDATION_FAILED value (1) for signature failure.
     function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, 
-        uint256 missingAccountFunds) external returns (uint256 validationData){       
-        if(userOp.initCode.length == 0){
-            require(msg.sender == entryPoint, "account: not from entrypoint");
-
-            bytes32 messageHash = userOpHash.toEthSignedMessageHash();
-            try this.checkNSignatures(messageHash, bytes(abi.encode(userOp)), 
-                userOp.signature, threshold){
-               require(nonce++ == userOp.nonce, "account: invalid nonce");
-            } catch {
-                validationData = SIG_VALIDATION_FAILED;              
-            }
+        uint256 missingAccountFunds) external returns (uint256 validationData){
+        _requireFromEntryPoint();
+        validationData = _validateSignature(userOp, userOpHash);
+        if (userOp.initCode.length == 0) {
+            _validateAndUpdateNonce(userOp);
         }
-        if (missingAccountFunds > 0) {
-            //pay prefund
+        _payPrefund(missingAccountFunds);
+    }
+
+    /**
+    * ensure the request comes from the known entrypoint.
+    */
+    function _requireFromEntryPoint() internal virtual view {
+        require(msg.sender == entryPoint, "account: not from EntryPoint");
+    }
+
+    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
+    internal returns (uint256 validationData) {
+        bytes32 hash = userOpHash.toEthSignedMessageHash();
+        try this.checkSignatures(
+            hash,
+            bytes(abi.encode(userOp)),
+            userOp.signature
+        ){
+            return 0;
+        } catch {
+            return SIG_VALIDATION_FAILED;
+        }
+        return 0;
+    }
+
+    function _validateAndUpdateNonce(UserOperation calldata userOp) internal {
+        require(nonce++ == userOp.nonce, "account: invalid nonce");
+    }
+
+    function _payPrefund(uint256 missingAccountFunds) internal {
+        if (missingAccountFunds != 0) {
             (bool success,) = payable(msg.sender).call{value : missingAccountFunds, gas : type(uint256).max}("");
             (success);
             //ignore failure (its EntryPoint's job to verify, not account.)
@@ -97,11 +122,11 @@ contract CandideWallet is Safe{
         address paymaster,
         address approveToken,
         uint256 approveAmount
-    ) public virtual{
+    ) public {
         // Only Entrypoint is allowed.
-        require(msg.sender == entryPoint, "Not from entrypoint");
+        require(msg.sender == entryPoint, "account: not from EntryPoint");
         // Execute transaction without further confirmations.
-        execute(to, value, data, operation, type(uint256).max);
+        _executeAndRevert(to, value, data, operation);
 
         //instead of sending a separate transaction to approve tokens
         //for the paymaster for each transaction, it can be approved here
@@ -111,10 +136,37 @@ contract CandideWallet is Safe{
         }
     }
 
+    function _executeAndRevert(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) internal {
+
+        bool success = execute(
+            to,
+            value,
+            data,
+            operation,
+            type(uint256).max
+        );
+
+        bytes memory returnData = Exec.getReturnData(type(uint256).max);
+        // Revert with the actual reason string
+        // Adopted from: https://github.com/Uniswap/v3-periphery/blob/464a8a49611272f7349c970e0fadb7ec1d3c1086/contracts/base/Multicall.sol#L16-L23
+        if (!success) {
+            if (returnData.length < 68) revert();
+            assembly {
+                returnData := add(returnData, 0x04)
+            }
+            revert(abi.decode(returnData, (string)));
+        }
+    }
+
     /// @dev There should be only one verified entrypoint per chain
     /// @dev so this function should only be used if there is a problem with
     /// @dev the main entrypoint
-    function replaceEntrypoint(address newEntrypoint) public authorized{
+    function replaceEntrypoint(address newEntrypoint) public authorized {
         entryPoint = newEntrypoint;
     }
 }
