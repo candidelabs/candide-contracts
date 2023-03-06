@@ -155,7 +155,7 @@ def test_transaction_through_entrypoint(
 
     op = [
         candideWalletProxy.address,
-        1,
+        candideWalletProxy.nonce(),
         bytes(0),
         callData,
         215000,
@@ -168,8 +168,6 @@ def test_transaction_through_entrypoint(
     ]
     ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
     assert beforeBalance + 5 == receiver.balance()
-
-    beforeBalance = receiver.balance()
 
 
 def test_transfer_from_entrypoint_with_init(
@@ -301,7 +299,7 @@ def test_transfer_from_entrypoint_with_deposit_paymaster(
 
     op = [
         candideWalletProxy.address,
-        1,
+        candideWalletProxy.nonce(),
         bytes(0),
         callData,
         215000,
@@ -362,7 +360,7 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
 
     op = [
         candideWalletProxy.address,
-        1,
+        candideWalletProxy.nonce(),
         bytes(0),
         callData,
         215000,
