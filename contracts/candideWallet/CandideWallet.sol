@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
-import "@safe-contracts/contracts/handler/CompatibilityFallbackHandler.sol";
 import "../utils/Exec.sol";
 
 /// @title CandideWallet - Smart contract wallet based on Gnosis safe that supports Eip4337
