@@ -1,6 +1,5 @@
 #!/usr/bin/python3
-
-from brownie import reverts
+from brownie import reverts, chain
 from web3.auto import w3
 from eth_abi.packed import encode_packed
 from testUtils import (
@@ -321,6 +320,7 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
     bundler,
     entryPoint,
     candidePaymaster,
+    mockOracle,
     receiver,
     accounts,
 ):
@@ -333,18 +333,19 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
     accounts[0].transfer(bundler, "3 ether")
     candidePaymaster.addStake(100, {"from": bundler, "value": "1 ether"})
     candidePaymaster.deposit({"from": bundler, "value": "1 ether"})
+    candidePaymaster.addToken(tokenErc20.address, mockOracle.address)
 
     tokenErc20.transfer(
-        candideWalletProxy.address, "1 ether", {"from": bundler}
+        candideWalletProxy.address, "5 ether", {"from": bundler}
     )
 
-    maxTokenCost = 5
-    maxTokenCostHex = str("{0:0{1}x}".format(maxTokenCost, 40))
-
-    costOfPost = 10**18
-    costOfPostHex = str("{0:0{1}x}".format(costOfPost, 40))
-
-    token = tokenErc20.address[2:]
+    paymasterData = [
+        tokenErc20.address,
+        1,  # SponsoringMode
+        chain.time() + 450,  # validUntil
+        0,  # Fee (in case mode == 0)
+        b'',
+    ]
 
     paymasterBeforeBalance = tokenErc20.balanceOf(candidePaymaster.address)
 
@@ -355,7 +356,7 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
         0,
         candidePaymaster.address,
         tokenErc20.address,
-        10**8,
+        20**18,
     )
 
     op = [
@@ -368,23 +369,25 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
         21000,
         1000000,
         1000000,
-        "0x",
+        bytes(340),
         "0x",
     ]
 
     datahash = candidePaymaster.getHash(
-        op, maxTokenCost, costOfPost, tokenErc20.address
+        op, paymasterData
     )
     bundlerSigner = w3.eth.account.from_key(bundler.private_key)
     sig = bundlerSigner.signHash(datahash)
     paymasterAndData = (
-        candidePaymaster.address[2:]
-        + maxTokenCostHex
-        + costOfPostHex
-        + token
+        str(candidePaymaster.address[2:])
+        + str(paymasterData[0][2:])
+        + str("{0:0{1}x}".format(paymasterData[1], 2))
+        + str("{0:0{1}x}".format(paymasterData[2], 12))
+        + str("{0:0{1}x}".format(paymasterData[3], 64))
         + sig.signature.hex()[2:]
     )
     op[9] = paymasterAndData
+
     ExecuteEntryPointHandleOps(op, entryPoint, owner, bundler)
 
     assert beforeBalance + 5 == receiver.balance()  # verifing eth is sent

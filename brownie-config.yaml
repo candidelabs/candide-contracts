@@ -22,6 +22,7 @@ compiler:
       runs: 200
     remappings:
       - '@openzeppelin/contracts=OpenZeppelin/openzeppelin-contracts@4.5.0/contracts/'
+      - '@chainlink/contracts=smartcontractkit/chainlink@1.13.0/contracts/'
     version: 0.8.12
 
 console:

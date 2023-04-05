@@ -10,6 +10,7 @@ from brownie import (
     BLSOpen,
     TestBLS,
     BLSAccountMultisig,
+    MockTokenPriceOracle,
 )
 from brownie_tokens import ERC20
 import json
@@ -18,6 +19,7 @@ from py_ecc.optimized_bn128.optimized_curve import curve_order
 from testBLSUtils import get_public_key, xyz_to_affine_G2
 
 entryPoint_addr = "0x0576a174D229E3cFA37253523E645A78A0C91B57"  # Goerli
+ethUsdOracle = "0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e"  # Goerli
 # entryPoint_addr = 0x79b0F2a81D2b5d507E56d42D452239e94b18Ddc8 #optimism Goerli
 # should be the same as the bundler's RPC
 bundler_pk = "e0cb334cac07d3555270bff73b3d7656a1256c2cebe856b85104ec84725c98c4"  # noqa: E501
@@ -168,8 +170,16 @@ def candidePaymaster(CandidePaymaster, entryPoint, bundler):
     Deploy CandidePaymaster contract
     """
     return CandidePaymaster.deploy(
-        entryPoint.address, bundler, {"from": bundler}
+        entryPoint.address, bundler, ethUsdOracle, {"from": bundler}
     )
+
+
+@pytest.fixture(scope="module")
+def mockOracle(accounts):
+    """
+    Deploy MockTokenPriceOracle contract
+    """
+    return MockTokenPriceOracle.deploy({"from": accounts[0]})
 
 
 @pytest.fixture(scope="module")
