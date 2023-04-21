@@ -16,6 +16,7 @@ contract CandideWallet is Safe{
     //EIP4337 trusted entrypoint
     address public entryPoint;
 
+    string public constant CANDIDE_VERSION = "0.0.1";
     //return value in case of signature failure, with no time-range.
     uint256 constant internal SIG_VALIDATION_FAILED = 1;
 
@@ -65,9 +66,8 @@ contract CandideWallet is Safe{
         uint256 missingAccountFunds) external returns (uint256 validationData){
         _requireFromEntryPoint();
         validationData = _validateSignature(userOp, userOpHash);
-        if (userOp.initCode.length == 0) {
-            _validateAndUpdateNonce(userOp);
-        }
+        // mimic normal Safe nonce behaviour: prevent parallel nonces
+        require(userOp.nonce < type(uint64).max, "account: nonsequential nonce");
         _payPrefund(missingAccountFunds);
     }
 
@@ -79,7 +79,7 @@ contract CandideWallet is Safe{
     }
 
     function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
-    internal returns (uint256 validationData) {
+    internal view returns (uint256 validationData) {
         bytes32 hash = userOpHash.toEthSignedMessageHash();
         try this.checkSignatures(
             hash,
@@ -91,10 +91,6 @@ contract CandideWallet is Safe{
             return SIG_VALIDATION_FAILED;
         }
         return 0;
-    }
-
-    function _validateAndUpdateNonce(UserOperation calldata userOp) internal {
-        require(nonce++ == userOp.nonce, "account: invalid nonce");
     }
 
     function _payPrefund(uint256 missingAccountFunds) internal {
@@ -167,5 +163,9 @@ contract CandideWallet is Safe{
     /// @dev the main entrypoint
     function replaceEntrypoint(address newEntrypoint) public authorized {
         entryPoint = newEntrypoint;
+    }
+
+    function getNonce() public view returns (uint256) {
+        return IEntryPoint(entryPoint).getNonce(address(this), 0);
     }
 }

@@ -2,6 +2,7 @@
 from brownie import reverts, chain
 from web3.auto import w3
 from eth_abi.packed import encode_packed
+from eth_account.messages import defunct_hash_message
 from testUtils import (
     ExecuteExecTransaction,
     ExecuteEntryPointHandleOps,
@@ -154,7 +155,7 @@ def test_transaction_through_entrypoint(
 
     op = [
         candideWalletProxy.address,
-        candideWalletProxy.nonce(),
+        candideWalletProxy.getNonce(),
         bytes(0),
         callData,
         215000,
@@ -298,7 +299,7 @@ def test_transfer_from_entrypoint_with_deposit_paymaster(
 
     op = [
         candideWalletProxy.address,
-        candideWalletProxy.nonce(),
+        candideWalletProxy.getNonce(),
         bytes(0),
         callData,
         215000,
@@ -320,7 +321,6 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
     bundler,
     entryPoint,
     candidePaymaster,
-    mockOracle,
     receiver,
     accounts,
 ):
@@ -333,7 +333,6 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
     accounts[0].transfer(bundler, "3 ether")
     candidePaymaster.addStake(100, {"from": bundler, "value": "1 ether"})
     candidePaymaster.deposit({"from": bundler, "value": "1 ether"})
-    candidePaymaster.addToken(tokenErc20.address, mockOracle.address)
 
     tokenErc20.transfer(
         candideWalletProxy.address, "5 ether", {"from": bundler}
@@ -344,6 +343,7 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
         1,  # SponsoringMode
         chain.time() + 450,  # validUntil
         0,  # Fee (in case mode == 0)
+        1000000000000000000,  # Exchange Rate
         b'',
     ]
 
@@ -361,7 +361,7 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
 
     op = [
         candideWalletProxy.address,
-        candideWalletProxy.nonce(),
+        candideWalletProxy.getNonce(),
         bytes(0),
         callData,
         215000,
@@ -376,14 +376,16 @@ def test_transfer_from_entrypoint_with_candidePaymaster(
     datahash = candidePaymaster.getHash(
         op, paymasterData
     )
+    message_hash = defunct_hash_message(datahash)
     bundlerSigner = w3.eth.account.from_key(bundler.private_key)
-    sig = bundlerSigner.signHash(datahash)
+    sig = bundlerSigner.signHash(message_hash)
     paymasterAndData = (
         str(candidePaymaster.address[2:])
         + str(paymasterData[0][2:])
         + str("{0:0{1}x}".format(paymasterData[1], 2))
         + str("{0:0{1}x}".format(paymasterData[2], 12))
         + str("{0:0{1}x}".format(paymasterData[3], 64))
+        + str("{0:0{1}x}".format(paymasterData[4], 64))
         + sig.signature.hex()[2:]
     )
     op[9] = paymasterAndData
