@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 contract CandidePaymaster is BasePaymaster {
 
@@ -29,32 +28,19 @@ contract CandidePaymaster is BasePaymaster {
       SponsoringMode mode;
       uint48 validUntil;
       uint256 fee;
+      uint256 exchangeRate;
       bytes signature;
     }
 
     //calculated cost of the postOp
-    uint256 constant public COST_OF_POST = 35000;
-
-    address public immutable verifyingSigner;
+    uint256 constant public COST_OF_POST = 45000;
     mapping(IERC20Metadata => uint256) public balances;
     //
-    AggregatorV3Interface private immutable ETH_USD_ORACLE;
-    AggregatorV3Interface private constant NULL_ORACLE = AggregatorV3Interface(address(0));
-    mapping(IERC20Metadata => AggregatorV3Interface) public oracles; // Oracles should be against USD, so if the token is UNI the oracle needs to be UNI/USD
 
-    constructor(IEntryPoint _entryPoint, address _verifyingSigner, address _ethUsdOracle) BasePaymaster(_entryPoint) {
-        ETH_USD_ORACLE = AggregatorV3Interface(_ethUsdOracle);
-        verifyingSigner = _verifyingSigner;
-        _transferOwnership(verifyingSigner);
-    }
+    event UserOperationSponsored(address indexed sender, address indexed token, uint256 cost);
 
-
-    /**
-     * owner of the paymaster should add supported tokens
-     */
-    function addToken(IERC20Metadata token, AggregatorV3Interface tokenPriceOracle) external onlyOwner {
-        require(oracles[token] == NULL_ORACLE, "CP04: Token already set");
-        oracles[token] = tokenPriceOracle;
+    constructor(IEntryPoint _entryPoint, address _owner) BasePaymaster(_entryPoint) {
+        _transferOwnership(_owner);
     }
 
     /**
@@ -64,7 +50,7 @@ contract CandidePaymaster is BasePaymaster {
      * @param amount amount to withdraw
      */
     function withdrawTokensTo(IERC20Metadata token, address target, uint256 amount) public {
-        require(verifyingSigner == msg.sender, "CP00: only verifyingSigner can withdraw tokens");
+        require(owner() == msg.sender, "CP00: only owner can withdraw tokens");
         balances[token] -= amount;
         token.safeTransfer(target, amount);
     }
@@ -99,7 +85,8 @@ contract CandidePaymaster is BasePaymaster {
             address(paymasterData.token),
             paymasterData.mode,
             paymasterData.validUntil,
-            paymasterData.fee
+            paymasterData.fee,
+            paymasterData.exchangeRate
         ));
     }
 
@@ -109,44 +96,9 @@ contract CandidePaymaster is BasePaymaster {
         SponsoringMode mode = SponsoringMode(uint8(bytes1(paymasterAndData[40:41])));
         uint48 validUntil = uint48(bytes6(paymasterAndData[41:47]));
         uint256 fee = uint256(bytes32(paymasterAndData[47:79]));
-        bytes memory signature = bytes(paymasterAndData[79:]);
-        return PaymasterData(token, mode, validUntil, fee, signature);
-    }
-
-    function getDerivedValue(
-        IERC20Metadata _token,
-        uint256 _ethBought
-    ) public view returns (uint256) {
-        uint8 _decimals = 18; // this can be hardcoded because we're always deriving a TOKEN / ETH price which is always 18 decimals
-        int256 decimals = int256(10 ** uint256(_decimals));
-        //
-        AggregatorV3Interface tokenOracle = oracles[_token];
-        require(tokenOracle != NULL_ORACLE, "CP00: unsupported token");
-        //
-        (, int256 tokenPrice, , , ) = tokenOracle.latestRoundData();
-        uint8 tokenOracleDecimals = tokenOracle.decimals();
-        tokenPrice = scalePrice(tokenPrice, tokenOracleDecimals, _decimals);
-        //
-        (, int256 ethPrice, , , ) = ETH_USD_ORACLE.latestRoundData();
-        uint8 ethOracleDecimals = ETH_USD_ORACLE.decimals();
-        ethPrice = scalePrice(ethPrice, ethOracleDecimals, _decimals);
-        //
-        int256 price = (tokenPrice * decimals) / ethPrice;
-        uint8 tokenDecimals = _token.decimals();
-        return (_ethBought * (10**tokenDecimals)) / uint256(price);
-    }
-
-    function scalePrice(
-        int256 _price,
-        uint8 _priceDecimals,
-        uint8 _decimals
-    ) internal pure returns (int256) {
-        if (_priceDecimals < _decimals) {
-            return _price * int256(10 ** uint256(_decimals - _priceDecimals));
-        } else if (_priceDecimals > _decimals) {
-            return _price / int256(10 ** uint256(_priceDecimals - _decimals));
-        }
-        return _price;
+        uint256 exchangeRate = uint256(bytes32(paymasterAndData[79:111]));
+        bytes memory signature = bytes(paymasterAndData[111:]);
+        return PaymasterData(token, mode, validUntil, fee, exchangeRate, signature);
     }
 
     /**
@@ -162,15 +114,14 @@ contract CandidePaymaster is BasePaymaster {
         PaymasterData memory paymasterData = parsePaymasterAndData(userOp.paymasterAndData);
         require(paymasterData.signature.length == 64 || paymasterData.signature.length == 65, "CP01: invalid signature length in paymasterAndData");
 
-        bytes32 _hash = getHash(userOp, paymasterData);
-        if (verifyingSigner != _hash.recover(paymasterData.signature)) {
+        bytes32 _hash = getHash(userOp, paymasterData).toEthSignedMessageHash();
+        if (owner() != _hash.recover(paymasterData.signature)) {
             return ("", _packValidationData(true, paymasterData.validUntil, 0));
         }
 
         address account = userOp.getSender();
-        uint256 maxTokenCost = getDerivedValue(paymasterData.token, maxCost);
         uint256 gasPriceUserOp = userOp.gasPrice();
-        bytes memory _context = abi.encode(account, paymasterData.token, paymasterData.mode, paymasterData.fee, gasPriceUserOp, maxTokenCost, maxCost);
+        bytes memory _context = abi.encode(account, paymasterData.token, paymasterData.mode, paymasterData.fee, paymasterData.exchangeRate, gasPriceUserOp);
 
         return (_context, _packValidationData(false, paymasterData.validUntil, 0));
     }
@@ -179,17 +130,19 @@ contract CandidePaymaster is BasePaymaster {
      * Perform the post-operation to charge the sender for the gas.
      */
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost) internal override {
-        (mode);
 
-        (address account, IERC20Metadata token, SponsoringMode sponsoringMode, uint256 fee, uint256 gasPricePostOp, uint160 maxTokenCost, uint256 maxCost)
-            = abi.decode(context, (address, IERC20Metadata, SponsoringMode, uint256, uint256, uint160, uint256));
+        (address account, IERC20Metadata token, SponsoringMode sponsoringMode, uint256 fee, uint256 exchangeRate, uint256 gasPricePostOp)
+            = abi.decode(context, (address, IERC20Metadata, SponsoringMode, uint256, uint256, uint256));
         if (sponsoringMode == SponsoringMode.FREE) return;
         //
-        uint256 actualTokenCost = (actualGasCost + COST_OF_POST * gasPricePostOp) * maxTokenCost / maxCost;
+        uint256 actualTokenCost = ((actualGasCost + (COST_OF_POST * gasPricePostOp)) * exchangeRate) / 1e18;
         if (sponsoringMode == SponsoringMode.FULL){
             actualTokenCost = actualTokenCost + fee;
         }
-        token.safeTransferFrom(account, address(this), actualTokenCost);
-        balances[token] += actualTokenCost;
+        if (mode != PostOpMode.postOpReverted) {
+            token.safeTransferFrom(account, address(this), actualTokenCost);
+            balances[token] += actualTokenCost;
+            emit UserOperationSponsored(account, address(token), actualTokenCost);
+        }
     }
 }
