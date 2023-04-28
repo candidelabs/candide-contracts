@@ -33,7 +33,7 @@ contract CandidePaymaster is BasePaymaster {
     }
 
     //calculated cost of the postOp
-    uint256 constant public COST_OF_POST = 45000;
+    uint256 constant public COST_OF_POST = 35000;
     mapping(IERC20Metadata => uint256) public balances;
     //
 
