@@ -19,8 +19,8 @@ contract CandidePaymaster is BasePaymaster {
     using SafeERC20 for IERC20Metadata;
 
     enum SponsoringMode {
-      FULL,
-      GAS,
+      GAS_AND_FEE,
+      GAS_ONLY,
       FREE
     }
 
@@ -150,7 +150,7 @@ contract CandidePaymaster is BasePaymaster {
         }
         //
         uint256 actualTokenCost = ((actualGasCost + (COST_OF_POST * gasPricePostOp)) * exchangeRate) / 1e18;
-        if (sponsoringMode == SponsoringMode.FULL){
+        if (sponsoringMode == SponsoringMode.GAS_AND_FEE){
             actualTokenCost = actualTokenCost + fee;
         }
         if (mode != PostOpMode.postOpReverted) {
