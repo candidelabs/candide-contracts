@@ -11,11 +11,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract CandidePaymaster is BasePaymaster {
+import "../../interfaces/IInsurance.sol";
+
+contract CandidePaymaster is BasePaymaster, IInsurance {
 
     using ECDSA for bytes32;
     using UserOperationLib for UserOperation;
     using SafeERC20 for IERC20Metadata;
+    IInsurance insurance;
 
     enum SponsoringMode {
       FULL,
@@ -41,6 +44,8 @@ contract CandidePaymaster is BasePaymaster {
 
     constructor(IEntryPoint _entryPoint, address _owner) BasePaymaster(_entryPoint) {
         _transferOwnership(_owner);
+        insurance = IInsurance(0x9129F14088491945B2897F88bd4bBd33DfC62031);
+
     }
 
     /**
@@ -133,6 +138,11 @@ contract CandidePaymaster is BasePaymaster {
 
         (address account, IERC20Metadata token, SponsoringMode sponsoringMode, uint256 fee, uint256 exchangeRate, uint256 gasPricePostOp)
             = abi.decode(context, (address, IERC20Metadata, SponsoringMode, uint256, uint256, uint256));
+        
+        // Call the issueInsurance function in the Insurance contract
+        bytes insuredEvent = abi.encodePacked("assuranceActivated", context);
+        policyId = insurance.issueInsurance(insuranceAmount, account, insuredEvent);
+
         if (sponsoringMode == SponsoringMode.FREE) return;
         //
         uint256 actualTokenCost = ((actualGasCost + (COST_OF_POST * gasPricePostOp)) * exchangeRate) / 1e18;
