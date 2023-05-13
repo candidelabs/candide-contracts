@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract CandidePaymaster is BasePaymaster {
 
@@ -18,8 +19,8 @@ contract CandidePaymaster is BasePaymaster {
     using SafeERC20 for IERC20Metadata;
 
     enum SponsoringMode {
-      FULL,
-      GAS,
+      GAS_AND_FEE,
+      GAS_ONLY,
       FREE
     }
 
@@ -120,8 +121,15 @@ contract CandidePaymaster is BasePaymaster {
         }
 
         address account = userOp.getSender();
-        uint256 gasPriceUserOp = userOp.gasPrice();
-        bytes memory _context = abi.encode(account, paymasterData.token, paymasterData.mode, paymasterData.fee, paymasterData.exchangeRate, gasPriceUserOp);
+        bytes memory _context = abi.encode(
+            account,
+            paymasterData.token,
+            paymasterData.mode,
+            paymasterData.fee,
+            paymasterData.exchangeRate,
+            userOp.maxFeePerGas,
+            userOp.maxPriorityFeePerGas
+        );
 
         return (_context, _packValidationData(false, paymasterData.validUntil, 0));
     }
@@ -131,12 +139,18 @@ contract CandidePaymaster is BasePaymaster {
      */
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost) internal override {
 
-        (address account, IERC20Metadata token, SponsoringMode sponsoringMode, uint256 fee, uint256 exchangeRate, uint256 gasPricePostOp)
-            = abi.decode(context, (address, IERC20Metadata, SponsoringMode, uint256, uint256, uint256));
+        (address account, IERC20Metadata token, SponsoringMode sponsoringMode, uint256 fee, uint256 exchangeRate, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas)
+            = abi.decode(context, (address, IERC20Metadata, SponsoringMode, uint256, uint256, uint256, uint256));
         if (sponsoringMode == SponsoringMode.FREE) return;
+        uint256 gasPricePostOp;
+        if (maxFeePerGas == maxPriorityFeePerGas) {
+            gasPricePostOp = maxFeePerGas;
+        } else {
+            gasPricePostOp = Math.min(maxFeePerGas, maxPriorityFeePerGas + block.basefee);
+        }
         //
         uint256 actualTokenCost = ((actualGasCost + (COST_OF_POST * gasPricePostOp)) * exchangeRate) / 1e18;
-        if (sponsoringMode == SponsoringMode.FULL){
+        if (sponsoringMode == SponsoringMode.GAS_AND_FEE){
             actualTokenCost = actualTokenCost + fee;
         }
         if (mode != PostOpMode.postOpReverted) {
