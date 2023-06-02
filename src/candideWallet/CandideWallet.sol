@@ -90,7 +90,6 @@ contract CandideWallet is Safe{
         } catch {
             return SIG_VALIDATION_FAILED;
         }
-        return 0;
     }
 
     function _payPrefund(uint256 missingAccountFunds) internal {
