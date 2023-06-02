@@ -1,9 +1,14 @@
-#production 
-/build
+# Compiler files
+cache/
+out/
 
-#tests cache
-*__pycache__
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
 
-# misc
+# Docs
+docs/
+
+# Dotenv file
 .env
-.hypothesis
