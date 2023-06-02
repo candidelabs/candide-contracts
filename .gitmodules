@@ -16,4 +16,4 @@
 
 [submodule "lib/safe-contracts"]
 	path = lib/safe-contracts
-	url = https://github.com/safe-contracts
+	url = https://github.com/safe-global/safe-contracts
