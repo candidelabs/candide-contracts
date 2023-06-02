@@ -4,11 +4,7 @@
 
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
-	url = https://github.com/openzeppelin/contracts
-
-[submodule "lib/chainlink"]
-	path = lib/chainlink
-	url = https://github.com/chainlink/contracts
+	url = https://github.com/openzeppelin/openzeppelin-contracts
 
 [submodule "lib/account-abstraction"]
 	path = lib/account-abstraction
