@@ -108,7 +108,7 @@ contract CandidePaymaster is BasePaymaster {
      * token address length 20
      * signature length 64 or 65
      */
-    function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost)
+    function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256)
     internal virtual override returns (bytes memory context, uint256 validationData){
         (userOpHash);
 
