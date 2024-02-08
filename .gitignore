@@ -1,6 +1,6 @@
 #production 
 /build
-
+/lib
 #tests cache
 *__pycache__
 

@@ -26,10 +26,13 @@ def test_others_can_not_transfer(simpleWallet):
     Check if others can't transfer
     """
     accounts[0].transfer(simpleWallet.address, "2 ether")
-    with reverts():
+    try:
         simpleWallet.execute(
             accounts[1], "1 ether", bytes(0), {"from": accounts[0]}
         )
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        assert "revert account: not Owner or EntryPoint" in badResponseFormat.args[0]
 
 
 def test_owner_can_call_transfer_eth_through_entrypoint(

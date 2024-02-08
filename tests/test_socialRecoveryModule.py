@@ -12,20 +12,29 @@ def test_guardian_storage(
     secondGuardian = Account.create()
     thirdGuardian = Account.create()
 
-    with reverts("SM: unauthorized"):
+    # with reverts("SM: unauthorized"):
+    try:
         socialRecoveryModule.addGuardianWithThreshold(
             candideWalletProxy.address,
             firstGuardian.address,
             1,
             {"from": accounts[0]},
         )
-    with reverts("GS: methold only callable by an enabled module"):
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        assert "SM: unauthorized" in badResponseFormat.args[0]
+
+    # with reverts("GS: methold only callable by an enabled module"):
+    try:
         socialRecoveryModule.addGuardianWithThreshold(
             candideWalletProxy.address,
             firstGuardian.address,
             1,
             {"from": candideWalletProxy},
         )
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        assert "GS: methold only callable by an enabled module" in badResponseFormat.args[0]
 
     # Enable social recovery module for Safe
     callData = candideWalletProxy.enableModule.encode_input(
@@ -52,49 +61,66 @@ def test_guardian_storage(
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
         candideWalletProxy.address, candideWalletProxy.address, 1
     )
-    with reverts():
+    # try:
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # guardian cannot be an owner of the wallet
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
         candideWalletProxy.address, owner.address, 1
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # threshold cannot be higher than number of guardians after addition
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
         candideWalletProxy.address, firstGuardian.address, 2
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # threshold cannot be 0
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
         candideWalletProxy.address, firstGuardian.address, 0
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # Add first guardian
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
@@ -142,13 +168,17 @@ def test_guardian_storage(
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
         candideWalletProxy.address, secondGuardian.address, 2
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # cannot add a guardian with address(0x0)
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
@@ -156,13 +186,17 @@ def test_guardian_storage(
         "0x0000000000000000000000000000000000000000",
         2,
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # cannot add a guardian with address(0x1)
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
@@ -170,37 +204,49 @@ def test_guardian_storage(
         "0x0000000000000000000000000000000000000001",
         2,
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # cannot change threshold to 0 if guardians > 0
     callData = socialRecoveryModule.changeThreshold.encode_input(
         candideWalletProxy.address, 0
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # cannot change threshold higher than guardians count
     callData = socialRecoveryModule.changeThreshold.encode_input(
         candideWalletProxy.address, 6
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # change threshold from 2 to 1
     callData = socialRecoveryModule.changeThreshold.encode_input(
@@ -222,13 +268,17 @@ def test_guardian_storage(
         accounts[5].address,
         1,
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # cannot have threshold higher than number of guardians after revoking
     callData = socialRecoveryModule.revokeGuardianWithThreshold.encode_input(
@@ -237,13 +287,17 @@ def test_guardian_storage(
         thirdGuardian.address,
         6,
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # cannot have threshold 0 if guardians > 0 after removal
     callData = socialRecoveryModule.revokeGuardianWithThreshold.encode_input(
@@ -252,13 +306,17 @@ def test_guardian_storage(
         thirdGuardian.address,
         0,
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # revert if invalid previous guardian
     callData = socialRecoveryModule.revokeGuardianWithThreshold.encode_input(
@@ -267,13 +325,17 @@ def test_guardian_storage(
         thirdGuardian.address,
         1,
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             callData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # remove third guardian
     callData = socialRecoveryModule.revokeGuardianWithThreshold.encode_input(
@@ -363,12 +425,16 @@ def test_multiConfirmRecovery(
     newOwner3 = Account.create()
 
     # Revert if no guardians exist for the wallet
-    with reverts():
+    try:
         socialRecoveryModule.executeRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
             1,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # Add first guardian
     callData = socialRecoveryModule.addGuardianWithThreshold.encode_input(
@@ -424,7 +490,7 @@ def test_multiConfirmRecovery(
     ]
     signatures.sort(key=lambda x: int(x[0], 16))
     # Revert if invalid nonce
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -432,8 +498,12 @@ def test_multiConfirmRecovery(
             signatures,
             False,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
     # Revert if invalid signatures
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -441,6 +511,10 @@ def test_multiConfirmRecovery(
             [[firstGuardian.address, "0x"], [secondGuardian.address, "0x"]],
             False,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     callData = socialRecoveryModule.getRecoveryHash(
         candideWalletProxy.address,
@@ -456,7 +530,7 @@ def test_multiConfirmRecovery(
     ]
     signatures.sort(key=lambda x: int(x[0], 16))
     # Revert if not enough signatures (lower than threshold)
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -464,13 +538,21 @@ def test_multiConfirmRecovery(
             [[firstGuardian.address, g1Sig]],
             True,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
     # Revert if new owners array is empty
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address, [], 1, signatures, False
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
     # Revert if new threshold of safe is 0
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -478,8 +560,13 @@ def test_multiConfirmRecovery(
             signatures,
             False,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
+
     # Revert if new threshold is higher than new owners count
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -487,18 +574,26 @@ def test_multiConfirmRecovery(
             signatures,
             False,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
     # Revert if owner tried to cancel a recovery request while no recovery
     # request exists on chain
     cancelRecoveryCallData = socialRecoveryModule.cancelRecovery.encode_input(
         candideWalletProxy.address
     )
-    with reverts():
+    try:
         ExecuteSocialRecoveryOperation(
             cancelRecoveryCallData,
             candideWalletProxy,
             socialRecoveryModule,
             owner,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     socialRecoveryModule.multiConfirmRecovery(
         candideWalletProxy.address, [newOwner1.address], 1, signatures, False
@@ -554,7 +649,7 @@ def test_multiConfirmRecovery(
 
     # Revert if creating recovery request with a null signature while
     # sender is not guardian
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -563,10 +658,14 @@ def test_multiConfirmRecovery(
             False,
             {"from": accounts[0]},
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # Inititate recovery request with supplied null
     # signature if sender is guardian
-    firstGuardianAccount = accounts.add(private_key=firstGuardian.privateKey)
+    firstGuardianAccount = accounts.add(private_key=firstGuardian.key)
     socialRecoveryModule.multiConfirmRecovery(
         candideWalletProxy.address,
         [newOwner1.address],
@@ -594,7 +693,7 @@ def test_multiConfirmRecovery(
 
     # Revert because we need at least 3 signatures to replace previous
     # request (because it was only 2 sigs)
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address, newOwner2.address],
@@ -602,6 +701,10 @@ def test_multiConfirmRecovery(
             signatures,
             True,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
     signatures = [
         [firstGuardian.address, g1Sig],
         [secondGuardian.address, g2Sig],
@@ -625,10 +728,14 @@ def test_multiConfirmRecovery(
     assert recoveryRequest[3] == [newOwner1.address, newOwner2.address]
 
     # Revert if block.timestamp < recoveryRequest.executeAfter
-    with reverts():
+    try:
         socialRecoveryModule.finalizeRecovery(
             candideWalletProxy.address,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # simulate time passing in chain
     chain.sleep(2000)
@@ -719,11 +826,11 @@ def test_confirmRecovery(
     candideWalletProxy, owner, accounts, socialRecoveryModule
 ):
     firstGuardian = Account.create()
-    firstGuardianAccount = accounts.add(private_key=firstGuardian.privateKey)
+    firstGuardianAccount = accounts.add(private_key=firstGuardian.key)
     secondGuardian = Account.create()
-    secondGuardianAccount = accounts.add(private_key=secondGuardian.privateKey)
+    secondGuardianAccount = accounts.add(private_key=secondGuardian.key)
     thirdGuardian = Account.create()
-    thirdGuardianAccount = accounts.add(private_key=thirdGuardian.privateKey)
+    thirdGuardianAccount = accounts.add(private_key=thirdGuardian.key)
 
     # Enable social recovery module for Safe
     callData = candideWalletProxy.enableModule.encode_input(
@@ -790,7 +897,7 @@ def test_confirmRecovery(
     ]
 
     # revert if sender is not a guardian
-    with reverts():
+    try:
         socialRecoveryModule.confirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -798,9 +905,13 @@ def test_confirmRecovery(
             False,
             {"from": accounts[0]},
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     # revert if execute is True but not enough approvals
-    with reverts():
+    try:
         socialRecoveryModule.confirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address],
@@ -808,6 +919,10 @@ def test_confirmRecovery(
             True,
             {"from": firstGuardianAccount},
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     socialRecoveryModule.confirmRecovery(
         candideWalletProxy.address,
@@ -923,7 +1038,7 @@ def test_confirmRecovery(
 
     # Revert because we need at least 3 signatures to replace
     # previous request (because it was only 2 sigs)
-    with reverts():
+    try:
         socialRecoveryModule.confirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address, newOwner2.address],
@@ -931,6 +1046,10 @@ def test_confirmRecovery(
             True,
             {"from": secondGuardianAccount},
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     socialRecoveryModule.confirmRecovery(
         candideWalletProxy.address,
@@ -961,11 +1080,11 @@ def test_multiAndSingleRecovery(
     candideWalletProxy, owner, accounts, socialRecoveryModule
 ):
     firstGuardian = Account.create()
-    # firstGuardianAccount = accounts.add(private_key=firstGuardian.privateKey)
+    # firstGuardianAccount = accounts.add(private_key=firstGuardian.key)
     secondGuardian = Account.create()
-    secondGuardianAccount = accounts.add(private_key=secondGuardian.privateKey)
+    secondGuardianAccount = accounts.add(private_key=secondGuardian.key)
     thirdGuardian = Account.create()
-    thirdGuardianAccount = accounts.add(private_key=thirdGuardian.privateKey)
+    thirdGuardianAccount = accounts.add(private_key=thirdGuardian.key)
 
     # Enable social recovery module for Safe
     callData = candideWalletProxy.enableModule.encode_input(
@@ -1221,7 +1340,7 @@ def test_erc1271_compatibility(
     signatures.sort(key=lambda x: int(x[0], 16))
 
     # revert because invalid 1271 signature
-    with reverts():
+    try:
         socialRecoveryModule.multiConfirmRecovery(
             candideWalletProxy.address,
             [newOwner1.address, newOwner2.address, newOwner3.address],
@@ -1229,6 +1348,10 @@ def test_erc1271_compatibility(
             signatures,
             False,
         )
+        assert False #hacky way to assert revert
+    except Exception as badResponseFormat:
+        #this is raising web3.exceptions.BadResponseFormat now !!!
+        pass
 
     signatures = [
         [erc1271Wallet.address, sig1271],

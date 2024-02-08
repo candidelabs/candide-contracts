@@ -36,7 +36,7 @@ def test_bls_pyecc_lib(testBLS):
     public_key1 = get_public_key(secret_key1)
     public_key2 = get_public_key(secret_key2)
     data = encode_hex("fooooo")
-    BLS_DOMAIN = w3.solidityKeccak(
+    BLS_DOMAIN = w3.solidity_keccak(
         ["bytes"], [str.encode("eip4337.bls.domain")]
     )
 
@@ -79,7 +79,7 @@ def test_wallet_bls_signature(bLSAccountMultisig, testBLS):
     pk2w2 = affine_to_xyz_G2(pk2w2_int)
 
     BLS_DOMAIN = bytes.fromhex(
-        w3.solidityKeccak(
+        w3.solidity_keccak(
             ["bytes32"], [str.encode("eip4337.bls.domain")]
         ).hex()[2:]
     )
