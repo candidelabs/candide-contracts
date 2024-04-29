@@ -3,7 +3,7 @@ pragma solidity >=0.8.12 <0.9.0;
 
 import "./storage/IGuardianStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import "@safe-contracts/contracts/Safe.sol";
+import "./../../interfaces/ISafe.sol";
 
 /// @title Social Recovery Module
 /// @author CANDIDE Labs
@@ -195,7 +195,13 @@ contract SocialRecoveryModule {
         _executeRecovery(_wallet, _newOwners, _newThreshold, _approvalCount);
     }
 
-
+    /**
+     * @notice Lets the guardians start the execution of the recovery request.
+     * Once triggered the recovery is pending for the recovery period before it can be finalised.
+     * @param _wallet The target wallet.
+     * @param _newOwners The new owners' addressess.
+     * @param _newThreshold The new threshold for the safe.
+     */
     function executeRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold) external {
         uint256 guardiansThreshold = threshold(_wallet);
         require(guardiansThreshold > 0, "SM: empty guardians");
@@ -205,14 +211,6 @@ contract SocialRecoveryModule {
         _executeRecovery(_wallet, _newOwners, _newThreshold, _approvalCount);
     }
 
-    /**
-     * @notice Lets the guardians start the execution of the recovery request.
-     * Once triggered the recovery is pending for the recovery period before it can be finalised.
-     * @param _wallet The target wallet.
-     * @param _newOwners The new owners' addressess.
-     * @param _newThreshold The new threshold for the safe.
-     * @param _approvalCount The collected (confirmed) guardians signatures for this recovery operation.
-     */
     function _executeRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, uint256 _approvalCount) internal {
         uint256 _nonce = nonce(_wallet);
         // If an ongoing recovery exists, replace only if more guardians than the previous guardians have approved this replacement
@@ -241,14 +239,14 @@ contract SocialRecoveryModule {
         uint256 newThreshold = request.newThreshold;
         delete recoveryRequests[_wallet];
 
-        Safe safe = Safe(payable(_wallet));
+        ISafe safe = ISafe(payable(_wallet));
         address[] memory owners = safe.getOwners();
 
         for (uint256 i = (owners.length - 1); i > 0; --i) {
             bool success = safe.execTransactionFromModule({
                 to: _wallet,
                 value: 0,
-                data: abi.encodeCall(OwnerManager.removeOwner, (owners[i - 1], owners[i], 1)),
+                data: abi.encodeCall(IOwnerManager.removeOwner, (owners[i - 1], owners[i], 1)),
                 operation: Enum.Operation.Call
             });
             if (!success) {
@@ -264,7 +262,7 @@ contract SocialRecoveryModule {
                 success = safe.execTransactionFromModule({
                     to: _wallet,
                     value: 0,
-                    data: abi.encodeCall(OwnerManager.swapOwner, (SENTINEL_OWNERS, owners[i], newOwners[i])),
+                    data: abi.encodeCall(IOwnerManager.swapOwner, (SENTINEL_OWNERS, owners[i], newOwners[i])),
                     operation: Enum.Operation.Call
                 });
                 if (!success) {
@@ -275,7 +273,7 @@ contract SocialRecoveryModule {
             success = safe.execTransactionFromModule({
                 to: _wallet,
                 value: 0,
-                data: abi.encodeCall(OwnerManager.addOwnerWithThreshold, (newOwners[i], 1)),
+                data: abi.encodeCall(IOwnerManager.addOwnerWithThreshold, (newOwners[i], 1)),
                 operation: Enum.Operation.Call
             });
             if (!success) {
@@ -288,7 +286,7 @@ contract SocialRecoveryModule {
             bool success = safe.execTransactionFromModule({
                 to: _wallet,
                 value: 0,
-                data: abi.encodeCall(OwnerManager.changeThreshold, (newThreshold)),
+                data: abi.encodeCall(IOwnerManager.changeThreshold, (newThreshold)),
                 operation: Enum.Operation.Call
             });
             if (!success) {

@@ -1,7 +1,0 @@
-[submodule "@account-abstraction"]
-	path = @account-abstraction
-	url = https://github.com/candidelabs/account-abstraction
-	branch=mod
-[submodule "@safe-contracts"]
-	path = @safe-contracts
-	url = https://github.com/safe-global/safe-contracts

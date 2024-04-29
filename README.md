@@ -1,20 +1,16 @@
-<!-- PROJECT LOGO -->
-
 <div align="center">
-  <h1 align="center">Candide Wallet Contracts</h1>
+  <h1 align="center">Candide Contracts</h1>
 </div>
 
-<div align="center">
-<img src="https://user-images.githubusercontent.com/7014833/203773780-04a0c8c0-93a6-43a4-bb75-570cb951dfa0.png" height =200>
-</div>
+![atelier-meta-web](https://github.com/candidelabs/.github/assets/7014833/5090c8d1-31ad-4daf-9efd-adae4c350c35)
 
 # About
 
 Candide Wallet is a smart contract wallet for Ethereum Mainnet and EVM compatible rollups.<br/>
-This repo includes the smart contracts used by Candide Wallet.
+This repo includes the smart contracts used by Candide Labs.
 
 # Features
-- <a href="https://eips.ethereum.org/EIPS/eip-4337">EIP-4337: Account Abstraction via Entry Point Contract</a> 
+- <a href="https://eips.ethereum.org/EIPS/eip-4337">EIP-4337: Account Abstraction via Entry Point Contract</a>
 - Account Recovery
 - Pay gas with ERC-20 using a Paymaster
 
@@ -30,7 +26,7 @@ Recovery methods are typical Ethereum accounts. They can be:
 - Institutions
 - Custodial services that offer cloud-based wallets
 
-Normal operations of the Account do not require the approval of added Guardians in the module. 
+Normal operations of the Account do not require the approval of added Guardians in the module.
 
 Owners of the account decide the threshold for the number of guardians needed for recovery, as well as the number of guardians. A typical single-owner account can have 3 guardians with a threshold of 2. This increases the likelihood that a single guardian can overtake the account.
 
@@ -59,23 +55,10 @@ We assume that the signer key belongs to its real owner. The probability of the 
 
 # Development
 
-### Fetch submodules
-```
-git submodule update --init --force --remote
-```
-### Install Ganache
-```
-npm install -g ganache-cli
-```
-
-### Install Poetry
-```
-curl -sSL https://install.python-poetry.org | python3 -
-```
 
 ### Install dependencies
 ```
-poetry install
+yarn install
 ```
 
 ### Add required .env variables
@@ -83,24 +66,10 @@ poetry install
 cp .env.example .env
 ```
 
-Add your own ETHERSCAN_TOKEN, WEB3_INFURA_PROJECT_ID to .env
-
+## Run tests
 ```
-source .env
-```
-
-### Add Goerli fork to brownie networks
-```
-poetry run brownie networks add development goerli-fork-dev cmd=ganache-cli host=http://127.0.0.1 chain_id=5 fork="https://goerli.infura.io/v3/$WEB3_INFURA_PROJECT_ID" accounts=10 mnemonic=brownie port=8545
-```
-
-### Add Goerli fork configs
-```
-poetry run brownie networks modify goerli-fork-dev explorer="https://api-goerli.etherscan.io/api?apikey=$ETHERSCAN_TOKEN"
-```
-## Run all tests
-```
-poetry run brownie test --network goerli-fork-dev
+yarn build
+yarn test
 ```
 
 <!-- LICENSE -->

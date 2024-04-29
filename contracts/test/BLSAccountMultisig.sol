@@ -2,8 +2,8 @@
 pragma solidity ^0.8.12;
 
 import "@account-abstraction/contracts/samples/SimpleAccount.sol";
-import "../../interfaces/IBLSAccountMultisig.sol";
-import "../../interfaces/IAggregatorMultisig.sol";
+import "./../interfaces/IBLSAccountMultisig.sol";
+import "./../interfaces/IAggregatorMultisig.sol";
 /**
  * Minimal BLS-based multisig account that uses an aggregated signature.
  * The account must maintain its own BLS public-key, and expose its trusted signature aggregator.
