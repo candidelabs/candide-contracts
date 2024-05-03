@@ -1,0 +1,44 @@
+name: certora
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rule: ['verifyRecoveryModule.sh']
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with: { python-version: 3.11 }
+
+      - name: Install certora cli
+        run: pip install -Iv certora-cli==6.1.3
+
+      - name: Install solc
+        run: |
+          wget https://github.com/ethereum/solidity/releases/download/v0.8.23/solc-static-linux
+          chmod +x solc-static-linux
+          sudo mv solc-static-linux /usr/local/bin/solc8.23
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify rule ${{ matrix.rule }}
+        run: |
+          echo "key length" ${#CERTORAKEY}
+          chmod +x ./certora/scripts/${{ matrix.rule }}
+          ./certora/scripts/${{ matrix.rule }}
+        env:
+          CERTORAKEY: ${{ secrets.CERTORA_KEY }}

@@ -1,0 +1,3 @@
+rule demo() {
+    assert true;
+}
