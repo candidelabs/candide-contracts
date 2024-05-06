@@ -33,6 +33,9 @@ jobs:
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc-0.8.23
 
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
       - name: Verify rule ${{ matrix.rule }}
         run: |
           echo "Certora key length" ${#CERTORAKEY}
