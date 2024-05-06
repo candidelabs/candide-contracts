@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rule: ['verifySocialRecoveryModule.sh']
+        rule: ['SocialRecoveryModule']
 
     steps:
       - uses: actions/checkout@v4
