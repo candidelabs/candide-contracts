@@ -1,0 +1,49 @@
+name: certora
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rule: ['SocialRecoveryModule']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+          cache: 'pip'
+
+      - name: Install certora cli
+        run: pip install -r certora/requirements.txt
+
+      - name: Install solc
+        run: |
+          wget https://github.com/ethereum/solidity/releases/download/v0.8.23/solc-static-linux
+          chmod +x solc-static-linux
+          sudo mv solc-static-linux /usr/local/bin/solc-0.8.23
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify rule ${{ matrix.rule }}
+        run: |
+          echo "Certora key length" ${#CERTORAKEY}
+          certoraRun certora/conf/${{ matrix.rule }}.conf --wait_for_results=all
+        env:
+          CERTORAKEY: ${{ secrets.CERTORA_KEY }}
