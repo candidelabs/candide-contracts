@@ -22,5 +22,5 @@ rule recoveryModuleCanBeDisabled {
     safeContract.disableModule@withrevert(e, prevModule, currentContract);
     bool isReverted = lastReverted;
 
-    assert !isReverted => !isReverted && !safeContract.isModuleEnabled(currentContract);
+    assert !isReverted => !safeContract.isModuleEnabled(currentContract);
 }
