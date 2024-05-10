@@ -143,3 +143,6 @@ fabric.properties
 
 # Certora
 .certora_internal
+
+# VS Code
+.vscode
