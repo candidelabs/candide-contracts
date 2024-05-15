@@ -62,14 +62,6 @@ contract SocialRecoveryModule {
         _;
     }
 
-    /**
-     * @notice Throws if there is an ongoing recovery request.
-     */
-    modifier whenNotRecovery(address _wallet) {
-        require(recoveryRequests[_wallet].executeAfter == 0, "SM: ongoing recovery");
-        _;
-    }
-
     constructor(IGuardianStorage _guardianStorage, uint256 _recoveryPeriod) {
         guardianStorage = _guardianStorage;
         recoveryPeriod = _recoveryPeriod;

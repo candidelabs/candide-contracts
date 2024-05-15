@@ -79,9 +79,7 @@ contract GuardianStorage is IGuardianStorage {
         GuardianStorageEntry storage entry = entries[_wallet];
         // Validate that threshold is smaller than or equal to number of guardians.
         require(_threshold <= entry.count, "GS: threshold must be lower or equal to guardians count");
-        if (entry.count == 0){
-            require(_threshold == 0, "GS: threshold must be 0");
-        }else{
+        if (entry.count > 0){
             require(_threshold > 0, "GS: threshold cannot be 0");
         }
         entry.threshold = _threshold;
