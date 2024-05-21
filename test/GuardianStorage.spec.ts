@@ -98,19 +98,30 @@ describe("GuardianStorage", async () => {
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: duplicate guardian");
     });
     it("should allow adding guardians with new threshold", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(false);
       expect(await socialRecoveryModule.getGuardians(account.target)).to.deep.eq([]);
       let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
-      await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
       expect(await socialRecoveryModule.guardiansCount(account.target)).to.eq(1);
       data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian2.address, 2]);
-      await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
       expect(await socialRecoveryModule.isGuardian(account.target, guardian2.address)).to.eq(true);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(2);
+      expect(await socialRecoveryModule.guardiansCount(account.target)).to.eq(2);
+    });
+    it("should allow adding guardians with same threshold", async () => {
+      const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.emit(guardianStorage, "ChangedThreshold");
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian2.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.not.emit(guardianStorage, "ChangedThreshold");
+      expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
+      expect(await socialRecoveryModule.isGuardian(account.target, guardian2.address)).to.eq(true);
+      expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
       expect(await socialRecoveryModule.guardiansCount(account.target)).to.eq(2);
     });
   });
@@ -276,19 +287,19 @@ describe("GuardianStorage", async () => {
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: threshold cannot be 0");
     });
     it("allows changing threshold to 0 even with no guardians", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(0);
       const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 0]);
-      await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(0);
     });
     it("allows changing threshold", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
       const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 2]);
-      await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(2);
     });
   });
