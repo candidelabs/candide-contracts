@@ -7,7 +7,7 @@ import "./../../../interfaces/ISafe.sol";
 /**
  * @title GuardianStorage
  * @notice Contract storing the state of wallets related to guardians.
- * This contract only contains basic setters/getters, only enabled modules for a wallet can modify its state
+ * This contract contains all guardian management rules, only enabled modules for a wallet can modify its state.
  * @author CANDIDE Labs team
  */
 contract GuardianStorage is IGuardianStorage {
@@ -25,6 +25,10 @@ contract GuardianStorage is IGuardianStorage {
 
     mapping (address => GuardianStorageEntry) internal entries;
 
+    event GuardianAdded(address indexed wallet, address indexed guardian);
+    event GuardianRevoked(address indexed wallet, address indexed guardian);
+    event ChangedThreshold(address indexed wallet, uint256 threshold);
+
     /**
      * @dev Throws if the caller is not an enabled module.
      * @param _wallet The target wallet.
@@ -36,11 +40,12 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
-     * @dev Lets an authorised module add a guardian to a wallet.
+     * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
      * @param _wallet The target wallet.
      * @param _guardian The guardian to add.
      */
-    function addGuardian(address _wallet, address _guardian) external onlyModule(_wallet) {
+    function addGuardianWithThreshold(address _wallet, address _guardian, uint256 _threshold) external onlyModule(_wallet) {
+        require(_threshold > 0, "GS: threshold cannot be 0");
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS && _guardian != _wallet, "GS: invalid guardian");
         require(!ISafe(payable(_wallet)).isOwner(_guardian), "GS: guardian cannot be an owner");
         GuardianStorageEntry storage entry = entries[_wallet];
@@ -53,21 +58,30 @@ contract GuardianStorage is IGuardianStorage {
             entry.guardians[SENTINEL_GUARDIANS] = _guardian;
         }
         entry.count++;
+        emit GuardianAdded(_wallet, _guardian);
+        if (entry.threshold != _threshold){
+            _changeThreshold(_wallet, _threshold);
+        }
     }
 
     /**
-     * @dev Lets an authorised module revoke a guardian from a wallet.
+     * @dev Lets an authorised module revoke a guardian from a wallet and change the threshold.
      * @param _wallet The target wallet.
      * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list
      * @param _guardian The guardian to revoke.
      */
-    function revokeGuardian(address _wallet, address _prevGuardian, address _guardian) external onlyModule(_wallet) {
+    function revokeGuardianWithThreshold(address _wallet, address _prevGuardian, address _guardian, uint256 _threshold) external onlyModule(_wallet) {
         GuardianStorageEntry storage entry = entries[_wallet];
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS, "GS: invalid guardian");
         require(entry.guardians[_prevGuardian] == _guardian, "GS: invalid previous guardian");
+        require(entry.count - 1 >= _threshold, "GS: invalid threshold");
         entry.guardians[_prevGuardian] = entry.guardians[_guardian];
         entry.guardians[_guardian] = address(0);
         entry.count--;
+        emit GuardianRevoked(_wallet, _guardian);
+        if (entry.threshold != _threshold){
+            _changeThreshold(_wallet, _threshold);
+        }
     }
 
     /**
@@ -76,6 +90,10 @@ contract GuardianStorage is IGuardianStorage {
      * @param _threshold New threshold.
      */
     function changeThreshold(address _wallet, uint256 _threshold) external onlyModule(_wallet) {
+        _changeThreshold(_wallet, _threshold);
+    }
+
+    function _changeThreshold(address _wallet, uint256 _threshold) internal {
         GuardianStorageEntry storage entry = entries[_wallet];
         // Validate that threshold is smaller than or equal to number of guardians.
         require(_threshold <= entry.count, "GS: threshold must be lower or equal to guardians count");
@@ -83,6 +101,7 @@ contract GuardianStorage is IGuardianStorage {
             require(_threshold > 0, "GS: threshold cannot be 0");
         }
         entry.threshold = _threshold;
+        emit ChangedThreshold(_wallet, _threshold);
     }
 
     /**
