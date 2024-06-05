@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 
-import "./storage/IGuardianStorage.sol";
-import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import "./../../interfaces/ISafe.sol";
+import {IGuardianStorage} from "./storage/IGuardianStorage.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {ISafe, IOwnerManager, Enum} from "./../../interfaces/ISafe.sol";
 
 /// @title Social Recovery Module
 /// @author CANDIDE Labs
@@ -31,16 +31,23 @@ contract SocialRecoveryModule {
         address[] newOwners;
     }
 
-    mapping (address => RecoveryRequest) internal recoveryRequests;
-    mapping (bytes32 => mapping (address => bool)) internal confirmedHashes;
-    mapping (address => uint256) internal walletsNonces;
+    mapping(address => RecoveryRequest) internal recoveryRequests;
+    mapping(bytes32 => mapping(address => bool)) internal confirmedHashes;
+    mapping(address => uint256) internal walletsNonces;
 
     // The guardians storage
     IGuardianStorage internal immutable guardianStorage;
     // Recovery period
     uint256 internal immutable recoveryPeriod;
 
-    event RecoveryExecuted(address indexed wallet, address[] indexed newOwners, uint256 newThreshold, uint256 nonce, uint64 executeAfter, uint256 guardiansApprovalCount);
+    event RecoveryExecuted(
+        address indexed wallet,
+        address[] indexed newOwners,
+        uint256 newThreshold,
+        uint256 nonce,
+        uint64 executeAfter,
+        uint256 guardiansApprovalCount
+    );
     event RecoveryFinalized(address indexed wallet, address[] indexed newOwners, uint256 newThreshold, uint256 nonce);
     event RecoveryCanceled(address indexed wallet, uint256 nonce);
 
@@ -67,7 +74,6 @@ contract SocialRecoveryModule {
 
     ////////////////
 
-
     /// @dev Returns the chain id used by this contract.
     function getChainId() public view returns (uint256) {
         uint256 id;
@@ -79,47 +85,46 @@ contract SocialRecoveryModule {
     }
 
     function domainSeparator() public view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                DOMAIN_SEPARATOR_TYPEHASH, 
-                keccak256(abi.encodePacked(NAME)),
-                keccak256(abi.encodePacked(VERSION)),
-                getChainId(), 
-                this
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    DOMAIN_SEPARATOR_TYPEHASH,
+                    keccak256(abi.encodePacked(NAME)),
+                    keccak256(abi.encodePacked(VERSION)),
+                    getChainId(),
+                    this
+                )
+            );
     }
 
     /// @dev Returns the bytes that are hashed to be signed by guardians.
-    function encodeRecoveryData(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, uint256 _nonce) public view returns (bytes memory) {
+    function encodeRecoveryData(
+        address _wallet,
+        address[] calldata _newOwners,
+        uint256 _newThreshold,
+        uint256 _nonce
+    ) public view returns (bytes memory) {
         bytes32 recoveryHash = keccak256(
-            abi.encode(
-                EXECUTE_RECOVERY_TYPEHASH, 
-                _wallet,
-                keccak256(abi.encodePacked(_newOwners)),
-                _newThreshold,
-                _nonce
-            )
+            abi.encode(EXECUTE_RECOVERY_TYPEHASH, _wallet, keccak256(abi.encodePacked(_newOwners)), _newThreshold, _nonce)
         );
         return abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator(), recoveryHash);
     }
 
     /// @dev Generates the recovery hash that should be signed by the guardian to authorize a recovery
-    function getRecoveryHash(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, uint256 _nonce) public view returns (bytes32) {
+    function getRecoveryHash(
+        address _wallet,
+        address[] calldata _newOwners,
+        uint256 _newThreshold,
+        uint256 _nonce
+    ) public view returns (bytes32) {
         return keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
     }
 
     /// @dev checks if valid signature to the provided signer, and if this signer is indeed a guardian, revert otherwise
-    function validateGuardianSignature(
-        address _wallet,
-        bytes32 _signHash,
-        address _signer,
-        bytes memory _signature
-    ) public view {
+    function validateGuardianSignature(address _wallet, bytes32 _signHash, address _signer, bytes memory _signature) public view {
         require(isGuardian(_wallet, _signer), "SM: Signer not a guardian");
         require(SignatureChecker.isValidSignatureNow(_signer, _signHash, _signature), "SM: Invalid guardian signature");
     }
-
 
     /**
      * @notice Lets single guardian confirm the execution of the recovery request.
@@ -136,7 +141,7 @@ contract SocialRecoveryModule {
         require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
         //
         uint256 _nonce = nonce(_wallet);
-        bytes32 recoveryHash = keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
+        bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         confirmedHashes[recoveryHash][msg.sender] = true;
         //
         if (!_execute) return;
@@ -156,7 +161,13 @@ contract SocialRecoveryModule {
      * @param _signatures The guardians signatures.
      * @param _execute Whether to auto-start execution of recovery.
      */
-    function multiConfirmRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, SignatureData[] memory _signatures, bool _execute) external {
+    function multiConfirmRecovery(
+        address _wallet,
+        address[] calldata _newOwners,
+        uint256 _newThreshold,
+        SignatureData[] memory _signatures,
+        bool _execute
+    ) external {
         require(_newOwners.length > 0, "SM: owners cannot be empty");
         require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
         require(_signatures.length > 0, "SM: empty signatures");
@@ -164,14 +175,14 @@ contract SocialRecoveryModule {
         require(guardiansThreshold > 0, "SM: empty guardians");
         //
         uint256 _nonce = nonce(_wallet);
-        bytes32 recoveryHash = keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
+        bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         address lastSigner = address(0);
         for (uint256 i = 0; i < _signatures.length; i++) {
             SignatureData memory value = _signatures[i];
-            if (value.signature.length == 0){
+            if (value.signature.length == 0) {
                 require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
                 require(msg.sender == value.signer, "SM: null signature should have the signer as the sender");
-            }else{
+            } else {
                 validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
             }
             require(value.signer > lastSigner, "SM: duplicate signers/invalid ordering");
@@ -205,7 +216,7 @@ contract SocialRecoveryModule {
         uint256 _nonce = nonce(_wallet);
         // If an ongoing recovery exists, replace only if more guardians than the previous guardians have approved this replacement
         RecoveryRequest storage request = recoveryRequests[_wallet];
-        if (request.executeAfter > 0){
+        if (request.executeAfter > 0) {
             require(_approvalCount > request.guardiansApprovalCount, "SM: not enough approvals for replacement");
             delete recoveryRequests[_wallet];
             emit RecoveryCanceled(_wallet, _nonce - 1);
@@ -247,7 +258,7 @@ contract SocialRecoveryModule {
         for (uint256 i = 0; i < newOwners.length; i++) {
             require(!isGuardian(_wallet, newOwners[i]), "SM: new owner cannot be guardian");
             bool success;
-            if (i == 0){
+            if (i == 0) {
                 if (newOwners[i] == owners[i]) continue;
                 success = safe.execTransactionFromModule({
                     to: _wallet,
@@ -271,8 +282,7 @@ contract SocialRecoveryModule {
             }
         }
 
-
-        if (newThreshold > 1){
+        if (newThreshold > 1) {
             bool success = safe.execTransactionFromModule({
                 to: _wallet,
                 value: 0,
@@ -313,7 +323,12 @@ contract SocialRecoveryModule {
      * @param _guardian The guardian to revoke.
      * @param _threshold The new threshold that will be set after execution of revocation.
      */
-    function revokeGuardianWithThreshold(address _wallet, address _prevGuardian, address _guardian, uint256 _threshold) external authorized(_wallet) {
+    function revokeGuardianWithThreshold(
+        address _wallet,
+        address _prevGuardian,
+        address _guardian,
+        uint256 _threshold
+    ) external authorized(_wallet) {
         guardianStorage.revokeGuardianWithThreshold(_wallet, _prevGuardian, _guardian, _threshold);
     }
 
@@ -342,13 +357,17 @@ contract SocialRecoveryModule {
      * @param _newThreshold The new threshold for the safe.
      * @return approvalCount The wallet's current recovery request
      */
-    function getRecoveryApprovals(address _wallet, address[] calldata _newOwners, uint256 _newThreshold) public view returns (uint256 approvalCount) {
+    function getRecoveryApprovals(
+        address _wallet,
+        address[] calldata _newOwners,
+        uint256 _newThreshold
+    ) public view returns (uint256 approvalCount) {
         uint256 _nonce = nonce(_wallet);
-        bytes32 recoveryHash = keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
+        bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         address[] memory guardians = getGuardians(_wallet);
         approvalCount = 0;
         for (uint256 i = 0; i < guardians.length; i++) {
-            if (confirmedHashes[recoveryHash][guardians[i]]){
+            if (confirmedHashes[recoveryHash][guardians[i]]) {
                 approvalCount++;
             }
         }
@@ -362,9 +381,14 @@ contract SocialRecoveryModule {
      * @param _newThreshold The new threshold for the safe.
      * @return approvalCount The wallet's current recovery request
      */
-    function hasGuardianApproved(address _wallet, address _guardian, address[] calldata _newOwners, uint256 _newThreshold) public view returns (bool) {
+    function hasGuardianApproved(
+        address _wallet,
+        address _guardian,
+        address[] calldata _newOwners,
+        uint256 _newThreshold
+    ) public view returns (bool) {
         uint256 _nonce = nonce(_wallet);
-        bytes32 recoveryHash = keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
+        bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         return confirmedHashes[recoveryHash][_guardian];
     }
 
@@ -413,5 +437,4 @@ contract SocialRecoveryModule {
     function nonce(address _wallet) public view returns (uint256 _nonce) {
         return walletsNonces[_wallet];
     }
-
 }

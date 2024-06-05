@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 
-import "./IGuardianStorage.sol";
-import "./../../../interfaces/ISafe.sol";
+import {IGuardianStorage} from "./IGuardianStorage.sol";
+import {ISafe} from "./../../../interfaces/ISafe.sol";
 
 /**
  * @title GuardianStorage
@@ -11,7 +11,6 @@ import "./../../../interfaces/ISafe.sol";
  * @author CANDIDE Labs team
  */
 contract GuardianStorage is IGuardianStorage {
-
     address internal constant SENTINEL_GUARDIANS = address(0x1);
 
     struct GuardianStorageEntry {
@@ -53,7 +52,7 @@ contract GuardianStorage is IGuardianStorage {
         if (entry.count == 0){
             entry.guardians[SENTINEL_GUARDIANS] = _guardian;
             entry.guardians[_guardian] = SENTINEL_GUARDIANS;
-        }else{
+        } else {
             entry.guardians[_guardian] = entry.guardians[SENTINEL_GUARDIANS];
             entry.guardians[SENTINEL_GUARDIANS] = _guardian;
         }
