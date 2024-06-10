@@ -24,6 +24,10 @@ methods {
     // GuardianManager Functions
     function threshold(address) external returns (uint256) envfree;
     function isGuardian(address, address) external returns (bool) envfree;
+    function guardiansCount(address) external returns (uint256) envfree;
+
+    // Harnessed Functions
+    function countGuardians(address) external returns (uint256) envfree;
 }
 
 // A ghost function to check the reachability for each wallet address for given two addresses.
@@ -401,3 +405,15 @@ rule removeGuardianChangesGuardians {
     assert !isGuardian(safeContract, toRemove), "revokeGuardian should remove the given guardian";
     assert isGuardian(safeContract, other) == isGuardianOtherBefore, "revokeGuardian should not remove or add other guardians";
 }
+
+invariant harnessCountGuardiansCorrect(address wallet) 
+    ghostGuardianCount[wallet] == countGuardians(wallet) &&
+    guardiansCount(wallet) == countGuardians(wallet)
+    {
+        preserved {
+            requireInvariant reachNull();
+            requireInvariant reachInvariant();
+            requireInvariant inListReachable();
+            requireInvariant reachableInList();
+        }
+    }
