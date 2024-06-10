@@ -11,6 +11,7 @@ methods {
     function nonce(address) external returns (uint256) envfree;
     function getRecoveryHash(address, address[], uint256, uint256) external returns (bytes32) envfree;
     function getRecoveryApprovals(address, address[], uint256) external returns (uint256) envfree;
+    function hasGuardianApproved(address, address, address[], uint256) external returns (bool) envfree;
 
     // Guardian Storage Functions
     function guardianStorageContract.countGuardians(address) external returns (uint256) envfree;
@@ -22,35 +23,32 @@ methods {
     function safeContract.getOwners() external returns (address[] memory) envfree;
     function safeContract.getThreshold() external returns (uint256) envfree;
 
-    // Wildcard Functions (Because of use of ISafe interface in Social Recovery Module)
-    function _.isModuleEnabled(address module) external => summarizeSafeIsModuleEnabled(calledContract, module) expect bool ALL; // `calledContract` is a special variable.
-    function _.isOwner(address owner) external => summarizeSafeIsOwner(calledContract, owner) expect bool ALL;
-    function _.getOwners() external => summarizeSafeGetOwners(calledContract) expect address[] ALL;
+    // Wildcard Functions
     function _.execTransactionFromModule(address to, uint256 value, bytes data, Enum.Operation operation) external with (env e) => summarizeSafeExecTransactionFromModule(calledContract, e, to, value, data, operation) expect bool ALL;
+    function _.isModuleEnabled(address module) external => DISPATCHER(false);
+    function _.isOwner(address owner) external => DISPATCHER(false);
+    function _.getOwners() external => DISPATCHER(false);
+    function _._ external => DISPATCH[] default NONDET;
 }
 
-// A summary function that helps the prover resolve calls to `safeContract`.
-function summarizeSafeIsModuleEnabled(address callee, address module) returns bool {
-    if (callee == safeContract) {
-        return safeContract.isModuleEnabled(module);
-    }
-    return _;
+ghost mapping(address => mathint) ghostNewThreshold {
+    init_state axiom forall address account. ghostNewThreshold[account] == 0;
+}
+hook Sload uint256 value recoveryRequests[KEY address account].newThreshold {
+    require ghostNewThreshold[account] == to_mathint(value);
+}
+hook Sstore recoveryRequests[KEY address account].newThreshold uint256 value {
+    ghostNewThreshold[account] = value;
 }
 
-// A summary function that helps the prover resolve calls to `safeContract`.
-function summarizeSafeIsOwner(address callee, address owner) returns bool {
-    if (callee == safeContract) {
-        return safeContract.isOwner(owner);
-    }
-    return _;
+ghost mapping(address => mathint) ghostNewOwnersLength {
+    init_state axiom forall address account. ghostNewOwnersLength[account] == 0;
 }
-
-// A summary function that helps the prover resolve calls to `safeContract`.
-function summarizeSafeGetOwners(address callee) returns address[] {
-    if (callee == safeContract) {
-        return safeContract.getOwners();
-    }
-    return _;
+hook Sload uint256 value recoveryRequests[KEY address account].newOwners.length {
+    require ghostNewOwnersLength[account] == to_mathint(value);
+}
+hook Sstore recoveryRequests[KEY address account].newOwners.length uint256 value {
+    ghostNewOwnersLength[account] = value;
 }
 
 // A summary function that helps the prover resolve calls to `safeContract`.
@@ -79,6 +77,36 @@ function requireGuardiansLinkedListIntegrity(address guardian) {
     require !currentContract.isGuardian(safeContract, guardian) =>
         (forall address prevGuardian. guardianStorageContract.entries[safeContract].guardians[prevGuardian] != guardian);
     require guardianStorageContract.entries[safeContract].count == guardianStorageContract.countGuardians(safeContract);
+}
+
+// Invariant that proves the relationship between the new threshold, new owner length and the
+// `confirmedHash`. If there is a `confirmedHash` for a given `hash` and `guardian`, then the
+// threshold should be greater than zero and less than or equal to the number of new owners.
+invariant approvedHashesHaveCorrectThreshold(address wallet, address[] newOwners, uint256 newThreshold, uint256 nonce, bytes32 hash)
+    hash == getRecoveryHash(wallet, newOwners, newThreshold, nonce) &&
+    (exists address guardian. currentContract.confirmedHashes[hash][guardian]) =>
+        0 < newThreshold && newThreshold <= newOwners.length
+    filtered {
+        f -> f.contract != safeContract
+    }
+
+// Invariant that proves the relationship between the new threshold and the owner.
+// Depending on the recovery cycle, there could be no new owners present in the 
+// recoveryRequest, or not. One thing is certain, the threshold should always be
+// less than or equal to the number of new owners.
+invariant thresholdIsAlwaysLessThanEqGuardiansCount(address account)
+    (ghostNewOwnersLength[account] == 0 => ghostNewThreshold[account] == 0) &&
+    (ghostNewOwnersLength[account] > 0 => ghostNewThreshold[account] > 0) &&
+    ghostNewThreshold[account] <= ghostNewOwnersLength[account]
+    filtered {
+        f -> f.contract != safeContract
+    }
+{
+    preserved executeRecovery(address wallet, address[] newOwners, uint256 newThreshold) with (env e) {
+        uint256 nonce = currentContract.nonce(wallet);
+        bytes32 hash = getRecoveryHash(wallet, newOwners, newThreshold, nonce);
+        requireInvariant approvedHashesHaveCorrectThreshold(wallet, newOwners, newThreshold, nonce, hash);
+    }
 }
 
 // This integrity rule verifies that if the addGuardianWithThreshold(...) executes, then ensure that:
@@ -301,6 +329,38 @@ rule disabledRecoveryModuleResultsInFinalizationRevert(env e) {
         (currentOwners[0] == safeContract.getOwners()[0] &&
             safeContract.getOwners().length == 1 &&
             currentThreshold == safeContract.getThreshold());
+}
+
+// This rule verifies that a guardian can only initiate recovery for the safe account it has been assigned to.
+// Here we only check initiation, and not execution of recovery.
+rule guardiansCanInitiateRecoveryForAssignedAccount(env e, address guardian, address[] newOwners, uint256 newThreshold) {
+    requireGuardiansLinkedListIntegrity(guardian);
+
+    require e.msg.sender == guardian;
+    require e.msg.value == 0;
+    require newOwners.length > 0;
+    require newThreshold > 0 && newThreshold <= newOwners.length;
+    // This is required as FV might have a value beyond 2^160 for address in the newOwners.
+    require forall uint256 i. 0 <= i && i < newOwners.length => to_mathint(newOwners[i]) < 2^160;
+
+    // The guardian can call the confirmRecovery twice with the same parameters, thus we check if the guardian had
+    // already confirmed the recovery.
+    bool guardianConfirmed = currentContract.hasGuardianApproved(safeContract, guardian, newOwners, newThreshold);
+    uint256 currentApprovals = currentContract.getRecoveryApprovals(safeContract, newOwners, newThreshold);
+
+    // Here we are only focusing on the initiation and not the execution of the recovery, thus execute
+    // parameter is passed as false.
+    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, false);
+    bool isReverted = lastReverted;
+
+    // This checks the guardian cannot initiate recovery for account not assigned by safe account.
+    assert isReverted => !currentContract.isGuardian(safeContract, guardian);
+    // This checks if recovery initiated, then the caller was a guardian of that safe account and has
+    // successfully initiated the process.
+    assert !isReverted =>
+        currentContract.isGuardian(safeContract, guardian) &&
+        currentContract.hasGuardianApproved(safeContract, guardian, newOwners, newThreshold) &&
+        (guardianConfirmed || to_mathint(currentContract.getRecoveryApprovals(safeContract, newOwners, newThreshold)) == currentApprovals + 1);
 }
 
 // Recovery can be cancelled
