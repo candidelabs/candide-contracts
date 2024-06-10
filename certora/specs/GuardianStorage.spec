@@ -54,7 +54,7 @@ persistent ghost address NULL {
     axiom to_mathint(NULL) == 0;
 }
 
-// Verifies that if threshold Zero there sghould be no guardian.
+// Verifies that if the threshold is Zero, then there should be no guardian.
 invariant guardianCountZeroIffThresholdZero(address wallet)
     threshold(wallet) == 0 <=> ghostGuardianCount[wallet] == 0
     {
@@ -78,7 +78,7 @@ invariant thresholdSet(address wallet)
         }
     }
 
-// every element with 0 in the guardians field can only reach the null pointer and itself
+// Every element with 0 in the guardians field can only reach the null pointer and itself.
 invariant nextNull()
     (forall address wallet. ghostGuardians[wallet][NULL] == 0) &&
     (forall address wallet. forall address X. forall address Y. ghostGuardians[wallet][X] == 0 && ghostReach(wallet, X, Y) => X == Y || Y == 0)
@@ -91,7 +91,7 @@ invariant nextNull()
         }
     }
 
-// every element reaches the 0 pointer (because we replace in reach the end sentinel with null)
+// Every element reaches the 0 pointer (because we replace in reach the end sentinel with null).
 invariant reachNull()
     (forall address wallet. forall address X. ghostReach(wallet, X, NULL))
     {
@@ -102,7 +102,7 @@ invariant reachNull()
         }
     }
 
-// every element that is reachable from another element is either the null pointer or part of the list.
+// Every element reachable from another element is either the null pointer or part of the list.
 invariant reachableInList()
     (forall address wallet. forall address X. forall address Y. ghostReach(wallet, X, Y) => X == Y || Y == 0 || ghostGuardians[wallet][Y] != 0)
     {
@@ -116,7 +116,7 @@ invariant reachableInList()
         }
     }
 
-// reach encodes a linear order. This axiom corresponds to Table 2 in [1].
+// Reach encodes a linear order. This axiom corresponds to Table 2 in [1].
 invariant reachInvariant()
     forall address wallet. forall address X. forall address Y. forall address Z. (
         ghostReach(wallet, X, X)
@@ -146,7 +146,7 @@ invariant inListReachable()
         }
     }
 
-// Checks that every element that is reachable from SENTINEL is part of the guardians list
+// Checks that every element reachable from SENTINEL is part of the guardians list.
 invariant reachHeadNext()
     forall address wallet. forall address X. (ghostReach(wallet, SENTINEL, X) && X != SENTINEL && X != NULL) =>
            (ghostGuardians[wallet][SENTINEL] != SENTINEL && ghostReach(wallet, ghostGuardians[wallet][SENTINEL], X))
@@ -162,7 +162,7 @@ invariant reachHeadNext()
         }
     }
 
-// every element reaches its direct successor (except for the tail-SENTINEL).
+// Every element reaches its direct successor (except for the tail-SENTINEL).
 invariant reachNext()
     forall address wallet. forall address X. reachSucc(wallet, X, ghostGuardians[wallet][X])
     {
@@ -306,6 +306,8 @@ invariant emptyListNotReachable()
         }
     }
 
+// This rule asserts that invariants related to reachability and count in the guardians list hold true after updating a guardian for a wallet.
+// It also checks updating a guardian for a wallet does not impact another wallet.
 rule storeHookPreservesInvariants(address wallet, address key, address value) {
     // These are checked in the hook.
     require key != NULL;
