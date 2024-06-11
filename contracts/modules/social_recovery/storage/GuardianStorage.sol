@@ -30,24 +30,22 @@ contract GuardianStorage is IGuardianStorage {
 
     /**
      * @dev Throws if the caller is not an enabled module.
-     * @param _wallet The target wallet.
      */
-    modifier onlyModule(address _wallet) {
+    modifier onlyWhenModuleIsEnabled() {
         // solhint-disable-next-line reason-string
-        require(ISafe(payable(_wallet)).isModuleEnabled(msg.sender), "GS: method only callable by an enabled module");
+        require(ISafe(payable(msg.sender)).isModuleEnabled(address(this)), "GS: method only callable when module is enabled");
         _;
     }
 
     /**
      * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
-     * @param _wallet The target wallet.
      * @param _guardian The guardian to add.
      */
-    function addGuardianWithThreshold(address _wallet, address _guardian, uint256 _threshold) external onlyModule(_wallet) {
+    function addGuardianWithThreshold(address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled() {
         require(_threshold > 0, "GS: threshold cannot be 0");
-        require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS && _guardian != _wallet, "GS: invalid guardian");
-        require(!ISafe(payable(_wallet)).isOwner(_guardian), "GS: guardian cannot be an owner");
-        GuardianStorageEntry storage entry = entries[_wallet];
+        require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS && _guardian != msg.sender, "GS: invalid guardian");
+        require(!ISafe(payable(msg.sender)).isOwner(_guardian), "GS: guardian cannot be an owner");
+        GuardianStorageEntry storage entry = entries[msg.sender];
         require(entry.guardians[_guardian] == address(0), "GS: duplicate guardian");
         if (entry.count == 0){
             entry.guardians[SENTINEL_GUARDIANS] = _guardian;
@@ -57,39 +55,37 @@ contract GuardianStorage is IGuardianStorage {
             entry.guardians[SENTINEL_GUARDIANS] = _guardian;
         }
         entry.count++;
-        emit GuardianAdded(_wallet, _guardian);
+        emit GuardianAdded(msg.sender, _guardian);
         if (entry.threshold != _threshold){
-            _changeThreshold(_wallet, _threshold);
+            _changeThreshold(msg.sender, _threshold);
         }
     }
 
     /**
      * @dev Lets an authorised module revoke a guardian from a wallet and change the threshold.
-     * @param _wallet The target wallet.
      * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list
      * @param _guardian The guardian to revoke.
      */
-    function revokeGuardianWithThreshold(address _wallet, address _prevGuardian, address _guardian, uint256 _threshold) external onlyModule(_wallet) {
-        GuardianStorageEntry storage entry = entries[_wallet];
+    function revokeGuardianWithThreshold(address _prevGuardian, address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled() {
+        GuardianStorageEntry storage entry = entries[msg.sender];
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS, "GS: invalid guardian");
         require(entry.guardians[_prevGuardian] == _guardian, "GS: invalid previous guardian");
         require(entry.count - 1 >= _threshold, "GS: invalid threshold");
         entry.guardians[_prevGuardian] = entry.guardians[_guardian];
         entry.guardians[_guardian] = address(0);
         entry.count--;
-        emit GuardianRevoked(_wallet, _guardian);
+        emit GuardianRevoked(msg.sender, _guardian);
         if (entry.threshold != _threshold){
-            _changeThreshold(_wallet, _threshold);
+            _changeThreshold(msg.sender, _threshold);
         }
     }
 
     /**
      * @dev Allows to update the number of required confirmations by guardians.
-     * @param _wallet The target wallet.
      * @param _threshold New threshold.
      */
-    function changeThreshold(address _wallet, uint256 _threshold) external onlyModule(_wallet) {
-        _changeThreshold(_wallet, _threshold);
+    function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled() {
+        _changeThreshold(msg.sender, _threshold);
     }
 
     function _changeThreshold(address _wallet, uint256 _threshold) internal {

@@ -4,5 +4,31 @@ import {SocialRecoveryModule} from "../../contracts/modules/social_recovery/Soci
 import {IGuardianStorage} from "../../contracts/modules/social_recovery/storage/IGuardianStorage.sol";
 
 contract SocialRecoveryModuleHarness is SocialRecoveryModule {
-    constructor(IGuardianStorage _guardianStorage, uint256 _recoveryPeriod) SocialRecoveryModule(_guardianStorage, _recoveryPeriod) {}
+    constructor(uint256 _recoveryPeriod) SocialRecoveryModule(_recoveryPeriod) {}
+
+    /**
+     * @notice Counts the guardians by iterating through the linked list starting at the sentinel address,
+     * instead of relying on the count storage variable.
+     * @dev This would not count "shadow" guardians that are not part of the linked list, which would
+     * never happen assuming integrity of the linked list.
+     * @param _wallet The target wallet.
+     * @return count of guardians.
+     */
+    function countGuardians(address _wallet) public view returns (uint256 count) {
+        GuardianStorageEntry storage entry = entries[_wallet];
+        address currentGuardian = entry.guardians[SENTINEL_GUARDIANS];
+
+        // The sentinel guardian pointing to address 0 is the initial state for the
+        // guardian storage entry for an account and is equivalent to an empty list
+        // where the sentinel points to itself. We handle this special case here.
+        if (currentGuardian == address(0)) {
+            return 0;
+        }
+
+        while (currentGuardian != SENTINEL_GUARDIANS) {
+            currentGuardian = entry.guardians[currentGuardian];
+            require(currentGuardian != address(0), "Guardian is address(0)");
+            count++;
+        }
+    }
 }

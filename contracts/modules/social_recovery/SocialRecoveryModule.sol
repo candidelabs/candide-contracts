@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 
-import {IGuardianStorage} from "./storage/IGuardianStorage.sol";
+import {GuardianStorage} from "./storage/GuardianStorage.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {ISafe, IOwnerManager, Enum} from "./../../interfaces/ISafe.sol";
 
 /// @title Social Recovery Module
 /// @author CANDIDE Labs
-contract SocialRecoveryModule {
+contract SocialRecoveryModule is GuardianStorage {
     string public constant NAME = "Social Recovery Module";
     string public constant VERSION = "0.0.1";
 
@@ -35,8 +35,6 @@ contract SocialRecoveryModule {
     mapping(bytes32 => mapping(address => bool)) internal confirmedHashes;
     mapping(address => uint256) internal walletsNonces;
 
-    // The guardians storage
-    IGuardianStorage internal immutable guardianStorage;
     // Recovery period
     uint256 internal immutable recoveryPeriod;
 
@@ -52,14 +50,6 @@ contract SocialRecoveryModule {
     event RecoveryCanceled(address indexed wallet, uint256 nonce);
 
     /**
-     * @notice Throws if the sender is not the module itself or the owner of the target wallet.
-     */
-    modifier authorized(address _wallet) {
-        require(msg.sender == _wallet, "SM: unauthorized");
-        _;
-    }
-
-    /**
      * @notice Throws if there is no ongoing recovery request.
      */
     modifier whenRecovery(address _wallet) {
@@ -67,8 +57,7 @@ contract SocialRecoveryModule {
         _;
     }
 
-    constructor(IGuardianStorage _guardianStorage, uint256 _recoveryPeriod) {
-        guardianStorage = _guardianStorage;
+    constructor(uint256 _recoveryPeriod) {
         recoveryPeriod = _recoveryPeriod;
     }
 
@@ -299,46 +288,10 @@ contract SocialRecoveryModule {
 
     /**
      * @notice Lets the owner cancel an ongoing recovery request.
-     * @param _wallet The target wallet.
      */
-    function cancelRecovery(address _wallet) external authorized(_wallet) whenRecovery(_wallet) {
-        delete recoveryRequests[_wallet];
-        emit RecoveryCanceled(_wallet, walletsNonces[_wallet] - 1);
-    }
-
-    /**
-     * @notice Lets the owner add a guardian for its wallet.
-     * @param _wallet The target wallet.
-     * @param _guardian The guardian to add.
-     * @param _threshold The new threshold that will be set after addition.
-     */
-    function addGuardianWithThreshold(address _wallet, address _guardian, uint256 _threshold) external authorized(_wallet) {
-        guardianStorage.addGuardianWithThreshold(_wallet, _guardian, _threshold);
-    }
-
-    /**
-     * @notice Lets the owner revoke a guardian from its wallet.
-     * @param _wallet The target wallet.
-     * @param _prevGuardian The previous guardian linking to the guardian in the linked list.
-     * @param _guardian The guardian to revoke.
-     * @param _threshold The new threshold that will be set after execution of revocation.
-     */
-    function revokeGuardianWithThreshold(
-        address _wallet,
-        address _prevGuardian,
-        address _guardian,
-        uint256 _threshold
-    ) external authorized(_wallet) {
-        guardianStorage.revokeGuardianWithThreshold(_wallet, _prevGuardian, _guardian, _threshold);
-    }
-
-    /**
-     * @notice Lets the owner change the guardian threshold required to initiate a recovery.
-     * @param _wallet The target wallet.
-     * @param _threshold The new threshold that will be set after execution of revocation.
-     */
-    function changeThreshold(address _wallet, uint256 _threshold) external authorized(_wallet) {
-        guardianStorage.changeThreshold(_wallet, _threshold);
+    function cancelRecovery() external whenRecovery(msg.sender) {
+        delete recoveryRequests[msg.sender];
+        emit RecoveryCanceled(msg.sender, walletsNonces[msg.sender] - 1);
     }
 
     /**
@@ -390,43 +343,6 @@ contract SocialRecoveryModule {
         uint256 _nonce = nonce(_wallet);
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         return confirmedHashes[recoveryHash][_guardian];
-    }
-
-    /**
-     * @notice Checks if an address is a guardian for a wallet.
-     * @param _wallet The target wallet.
-     * @param _guardian The address to check.
-     * @return _isGuardian `true` if the address is a guardian for the wallet otherwise `false`.
-     */
-    function isGuardian(address _wallet, address _guardian) public view returns (bool _isGuardian) {
-        return guardianStorage.isGuardian(_wallet, _guardian);
-    }
-
-    /**
-     * @notice Counts the number of active guardians for a wallet.
-     * @param _wallet The target wallet.
-     * @return _count The number of active guardians for a wallet.
-     */
-    function guardiansCount(address _wallet) public view returns (uint256 _count) {
-        return guardianStorage.guardiansCount(_wallet);
-    }
-
-    /**
-     * @dev Retrieves the wallet threshold count.
-     * @param _wallet The target wallet.
-     * @return _threshold Threshold count.
-     */
-    function threshold(address _wallet) public view returns (uint256 _threshold) {
-        return guardianStorage.threshold(_wallet);
-    }
-
-    /**
-     * @notice Get the active guardians for a wallet.
-     * @param _wallet The target wallet.
-     * @return _guardians the active guardians for a wallet.
-     */
-    function getGuardians(address _wallet) public view returns (address[] memory _guardians) {
-        return guardianStorage.getGuardians(_wallet);
     }
 
     /**

@@ -21,13 +21,13 @@ describe("GuardianStorage", async () => {
     const guardianStorage = await ethers.deployContract("GuardianStorage", [], { signer: deployer });
     const socialRecoveryModule = await ethers.deployContract(
       "SocialRecoveryModule",
-      [await guardianStorage.getAddress(), 3600],
+      [3600],
       { signer: deployer },
     );
     const account = await hre.ethers.deployContract("TestExecutor", [], { signer: deployer });
     await account.testSetup([owner1.address, owner2.address], 1, ADDRESS_ZERO, [await socialRecoveryModule.getAddress()]);
     //
-    return { account, socialRecoveryModule, guardianStorage };
+    return { account, socialRecoveryModule, guardianStorage: socialRecoveryModule };
   }
 
   async function _addGuardianWithThreshold(
@@ -36,17 +36,12 @@ describe("GuardianStorage", async () => {
     guardian: string,
     threshold: number,
   ) {
-    const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian, threshold]);
+    const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian, threshold]);
     await account.exec(socialRecoveryModule.target, 0, data);
   }
 
 
   describe("Adding Guardians", async () => {
-    it("should not allow adding guardian if not authorized", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
-      await expect(deployer.sendTransaction({ to: socialRecoveryModule.target, data: data })).to.be.revertedWith("SM: unauthorized");
-    });
     it("should not allow adding guardian if SocialRecoveryModule is not an enabled module", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       const removeModuleData = account.interface.encodeFunctionData("disableModule", [
@@ -55,58 +50,58 @@ describe("GuardianStorage", async () => {
       ]);
       await account.exec(account.target, 0, removeModuleData);
       //
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: method only callable by an enabled module");
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: method only callable when module is enabled");
     });
     it("should not allow adding zero address as guardian", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, ADDRESS_ZERO, 1]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [ADDRESS_ZERO, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: invalid guardian");
     });
     it("should not allow adding sentinel address as guardian", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, SENTINEL_ADDRESS, 1]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [SENTINEL_ADDRESS, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: invalid guardian");
     });
     it("should not allow adding itself (wallet) as guardian", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, account.target, 1]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: invalid guardian");
     });
     it("should not allow adding the wallet owners as guardians", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, owner1.address, 1]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [owner1.address, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: guardian cannot be an owner");
     });
     it("should not allow adding guardian with 0 threshold", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 0]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 0]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: threshold cannot be 0");
     });
     it("should not allow adding x guardians with threshold >x", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 2]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 2]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith(
         "GS: threshold must be lower or equal to guardians count",
       );
     });
     it("should not allow adding duplicate guardians", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
       await account.exec(socialRecoveryModule.target, 0, data);
-      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: duplicate guardian");
     });
     it("should allow adding guardians with new threshold", async () => {
       const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(false);
       expect(await socialRecoveryModule.getGuardians(account.target)).to.deep.eq([]);
-      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
       expect(await socialRecoveryModule.guardiansCount(account.target)).to.eq(1);
-      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian2.address, 2]);
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian2.address, 2]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
       expect(await socialRecoveryModule.isGuardian(account.target, guardian2.address)).to.eq(true);
@@ -115,9 +110,9 @@ describe("GuardianStorage", async () => {
     });
     it("should allow adding guardians with same threshold", async () => {
       const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
-      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian1.address, 1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.emit(guardianStorage, "ChangedThreshold");
-      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian2.address, 1]);
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian2.address, 1]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded").and.to.not.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
       expect(await socialRecoveryModule.isGuardian(account.target, guardian2.address)).to.eq(true);
@@ -126,16 +121,6 @@ describe("GuardianStorage", async () => {
     });
   });
   describe("Revoking Guardians", async () => {
-    it("should not allow revoking guardian if not authorized", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
-        SENTINEL_ADDRESS,
-        guardian1.address,
-        0,
-      ]);
-      await expect(deployer.sendTransaction({ to: socialRecoveryModule.target, data: data })).to.be.revertedWith("SM: unauthorized");
-    });
     it("should not allow revoking guardian if SocialRecoveryModule is not an enabled module", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -145,13 +130,12 @@ describe("GuardianStorage", async () => {
       ]);
       await account.exec(account.target, 0, removeModuleData);
       //
-      const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [account.target, SENTINEL_ADDRESS, guardian1.address, 0]);
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: method only callable by an enabled module");
+      const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [SENTINEL_ADDRESS, guardian1.address, 0]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: method only callable when module is enabled");
     });
     it("can not revoke non guardians", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         SENTINEL_ADDRESS,
         guardian1.address,
         0,
@@ -162,7 +146,6 @@ describe("GuardianStorage", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       //
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         SENTINEL_ADDRESS,
         ADDRESS_ZERO,
         0,
@@ -174,7 +157,6 @@ describe("GuardianStorage", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       //
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         SENTINEL_ADDRESS,
         SENTINEL_ADDRESS,
         0,
@@ -186,7 +168,6 @@ describe("GuardianStorage", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         SENTINEL_ADDRESS,
         guardian1.address,
         1,
@@ -198,7 +179,6 @@ describe("GuardianStorage", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         SENTINEL_ADDRESS,
         guardian2.address,
         0,
@@ -209,7 +189,6 @@ describe("GuardianStorage", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         owner1.address,
         guardian1.address,
         0,
@@ -221,7 +200,6 @@ describe("GuardianStorage", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         guardian2.address,
         guardian1.address,
         1,
@@ -236,7 +214,6 @@ describe("GuardianStorage", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
       const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
-        account.target,
         guardian2.address,
         guardian1.address,
         1,
@@ -248,13 +225,6 @@ describe("GuardianStorage", async () => {
     });
   });
   describe("Changing Threshold", async () => {
-    it("reverts if not authorized", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
-      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
-      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 1]);
-      await expect(deployer.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: unauthorized");
-    });
     it("should not allow changing threshold if SocialRecoveryModule is not an enabled module", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -265,15 +235,15 @@ describe("GuardianStorage", async () => {
       ]);
       await account.exec(account.target, 0, removeModuleData);
       //
-      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 1]);
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: method only callable by an enabled module");
+      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: method only callable when module is enabled");
     });
     it("reverts if threshold is higher than guardians count", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian3.address, 2);
-      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 4]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [4]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith(
         "GS: threshold must be lower or equal to guardians count",
       );
@@ -283,13 +253,13 @@ describe("GuardianStorage", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian3.address, 2);
-      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 0]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [0]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("GS: threshold cannot be 0");
     });
     it("allows changing threshold to 0 even with no guardians", async () => {
       const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTests);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(0);
-      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 0]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [0]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(0);
     });
@@ -298,7 +268,7 @@ describe("GuardianStorage", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
-      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [account.target, 2]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [2]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(2);
     });

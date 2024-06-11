@@ -24,7 +24,7 @@ describe("SocialRecoveryModule", async () => {
     const guardianStorage = await ethers.deployContract("GuardianStorage", [], { signer: deployer });
     const socialRecoveryModule = await ethers.deployContract(
       "SocialRecoveryModule",
-      [await guardianStorage.getAddress(), 3600],
+      [3600],
       { signer: deployer },
     );
     const account = await hre.ethers.deployContract("TestExecutor", [], { signer: deployer });
@@ -39,7 +39,7 @@ describe("SocialRecoveryModule", async () => {
     guardian: string,
     threshold: number,
   ) {
-    const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [account.target, guardian, threshold]);
+    const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian, threshold]);
     await account.exec(socialRecoveryModule.target, 0, data);
   }
 
@@ -543,14 +543,9 @@ describe("SocialRecoveryModule", async () => {
     });
   });
   describe("Cancel Recovery", async () => {
-    it("reverts if not authorized", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery", [account.target]);
-      await expect(deployer.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: unauthorized");
-    });
     it("reverts if there's no ongoing recovery", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      const data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery", [account.target]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("SM: no ongoing recovery");
     });
     it("allows cancelling an ongoing recovery", async () => {
@@ -559,7 +554,7 @@ describe("SocialRecoveryModule", async () => {
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
-      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery", [account.target]);
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryCanceled");
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
       expect(recoveryRequest.executeAfter).to.eq(0);

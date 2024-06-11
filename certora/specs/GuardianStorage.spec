@@ -370,6 +370,7 @@ rule addGuardianChangesEntries {
     address toAdd;
     uint256 threshold;
     env e;
+    require e.msg.sender == safeContract;
     require safeContract.isModuleEnabled(e.msg.sender);
 
     requireInvariant reachNull();
@@ -379,7 +380,7 @@ rule addGuardianChangesEntries {
     requireInvariant countZeroIffListEmpty();
     require other != toAdd;
     bool isGuardianOtherBefore = isGuardian(safeContract, other);
-    addGuardianWithThreshold(e, safeContract, toAdd, threshold);
+    addGuardianWithThreshold(e, toAdd, threshold);
 
     assert isGuardian(safeContract, toAdd), "addGuardian should add the given guardian";
     assert isGuardian(safeContract, other) == isGuardianOtherBefore, "addGuardian should not remove or add other guardians";
@@ -392,6 +393,7 @@ rule removeGuardianChangesGuardians {
     address prevGuardian;
     uint256 threshold;
     env e;
+    require e.msg.sender == safeContract;
     require safeContract.isModuleEnabled(e.msg.sender);
 
     requireInvariant reachNull();
@@ -400,7 +402,7 @@ rule removeGuardianChangesGuardians {
     requireInvariant reachableInList();
     require other != toRemove;
     bool isGuardianOtherBefore = isGuardian(safeContract, other);
-    revokeGuardianWithThreshold(e, safeContract, prevGuardian, toRemove, threshold);
+    revokeGuardianWithThreshold(e, prevGuardian, toRemove, threshold);
 
     assert !isGuardian(safeContract, toRemove), "revokeGuardian should remove the given guardian";
     assert isGuardian(safeContract, other) == isGuardianOtherBefore, "revokeGuardian should not remove or add other guardians";
