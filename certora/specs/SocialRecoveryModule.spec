@@ -300,6 +300,28 @@ rule confirmRecoveryCanAlwaysBeInitiatedByGuardian(env e, address guardian, addr
         currentContract.recoveryRequests[safeContract].newOwners[index] == newOwners[index];
 }
 
+// This rule verifies that if the recovery is initiated using `confirmRecovery`, then the msg.sender must be the guardian of the Safe.
+// This also checks the recovery request parameters like execution time and new threshold if the call was also to execute the recovery.
+rule confirmRecoveryIsInitiatedOnlyByGuardian(env e, address[] newOwners, uint256 newThreshold, bool execute) {
+    require newThreshold <= newOwners.length;
+    require e.block.timestamp + currentContract.recoveryPeriod < max_uint64; // The year will be 2500+ (Roughly 500 years from now).
+
+    uint256 nonce = currentContract.nonce(safeContract);
+    bytes32 recoveryHash = currentContract.getRecoveryHash(safeContract, newOwners, newThreshold, nonce);
+
+    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, execute);
+    bool success = !lastReverted;
+
+    // Check if the recovery initiation started.
+    assert success =>
+        currentContract.isGuardian(safeContract, e.msg.sender) &&
+        currentContract.confirmedHashes[recoveryHash][e.msg.sender];
+    // Check if the recovery is executed as well.
+    assert success && execute =>
+        to_mathint(currentContract.recoveryRequests[safeContract].executeAfter) == e.block.timestamp + currentContract.recoveryPeriod &&
+        currentContract.recoveryRequests[safeContract].newThreshold == newThreshold;
+}
+
 // This rule verifies that the finalization cannot happen if the recovery module is not enabled.
 // Exceptions are made for the case where the Safe has only one owner and the recovery is initiated
 // - with zero new owners and zero as the new threshold
