@@ -311,7 +311,7 @@ rule confirmRecoveryCanAlwaysBeInitiatedByGuardian(env e, address guardian, addr
 // - with zero new owners and zero as the new threshold
 // - with same last owner & threshold as Safe.
 rule disabledRecoveryModuleResultsInFinalizationRevert(env e) {
-    address[] currentOwners = safeContract.getOwners();
+    address[] ownersBefore = safeContract.getOwners();
     uint256 currentThreshold = safeContract.getThreshold();
 
     require !safeContract.isModuleEnabled(currentContract);
@@ -326,7 +326,7 @@ rule disabledRecoveryModuleResultsInFinalizationRevert(env e) {
     // owner is added. Though it is not possible to have a recovery initiation with zero
     // owners.
     assert isReverted ||
-        (currentOwners[0] == safeContract.getOwners()[0] &&
+        (ownersBefore[0] == safeContract.getOwners()[0] &&
             safeContract.getOwners().length == 1 &&
             currentThreshold == safeContract.getThreshold());
 }
@@ -401,4 +401,33 @@ rule cancelRecoveryDoesNotAffectOtherWallet(env e, address otherWallet) {
         otherRequestBefore.newOwners.length == otherRequestAfter.newOwners.length &&
         otherRequestBefore.newOwners[i] == otherRequestAfter.newOwners[i] &&
         otherWalletNonceBefore == currentContract.walletsNonces[otherWallet];
+}
+
+rule recoveryFinalisation(env e) {
+    address[] ownersBefore = safeContract.getOwners();
+    uint ownersBeforeCount;
+
+    address[] newOwners;
+    uint newOwnersCount;
+    // x represents any arbitrary index of newOwners[].
+    uint x;
+
+    require currentContract.recoveryRequests[safeContract].newOwners.length > 0;
+    require newOwnersCount == currentContract.recoveryRequests[safeContract].newOwners.length;
+    require x < newOwnersCount;
+
+    require forall uint256 i. 0 <= i && i < newOwnersCount => newOwners[i] == currentContract.recoveryRequests[safeContract].newOwners[i];
+
+    require ownersBefore.length > 0;
+    require ownersBeforeCount < ownersBefore.length;
+    require ownersBefore[ownersBeforeCount] != 0 && ownersBefore[ownersBeforeCount] != 1; 
+    require currentContract.recoveryRequests[safeContract].executeAfter > 0;
+    require to_mathint(e.block.timestamp) > to_mathint(currentContract.recoveryRequests[safeContract].executeAfter);
+    
+    finalizeRecovery@withrevert(e, safeContract);
+    bool isLastReverted = lastReverted;
+
+    address[] ownersAfter = safeContract.getOwners();
+    assert !isLastReverted => ownersAfter.length == newOwnersCount;
+    assert !isLastReverted => ownersAfter[x] == newOwners[x];
 }
