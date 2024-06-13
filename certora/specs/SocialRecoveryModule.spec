@@ -424,15 +424,26 @@ rule cancelRecoveryDoesNotAffectOtherWallet(env e, address otherWallet) {
         otherWalletNonceBefore == currentContract.walletsNonces[otherWallet];
 }
 
-// There should be no way to finalize the recovery before the delay period is over
-rule canFinalizeRecoveryOnlyAfterDelayPeriod(env e) {
-    requireInitiatedRecovery(safeContract);
-
-    uint64 recoveryTimestamp = currentContract.recoveryRequests[safeContract].executeAfter;
+// Recovery can be finalized by anyone. But the success depends on few things:
+// - The recovery request should be initiated.
+// - No ether should be sent with the transaction.
+// - The delay period should be over.
+// - New owner should not be a guardian.
+// There is also a check on current safe owner length (this is for FV, in reality it should never be zero).
+rule finalizeRecovery(env e) {
+    uint64 executeAfter = currentContract.recoveryRequests[safeContract].executeAfter;
 
     currentContract.finalizeRecovery@withrevert(e, safeContract);
 
     bool success = !lastReverted;
 
-    assert success => require_uint64(e.block.timestamp) >= recoveryTimestamp, "Recovery finalized before delay period";
+    assert success => require_uint64(e.block.timestamp) >= executeAfter;
+    assert !success =>
+        safeContract.getOwners().length == 0 ||
+        currentContract.walletsNonces[safeContract] == 0 ||
+        executeAfter == 0 ||
+        e.msg.value != 0 ||
+        require_uint64(e.block.timestamp) < executeAfter ||
+        (exists uint256 i. currentContract.recoveryRequests[safeContract].newOwners[i] != SENTINEL() &&
+        currentContract.entries[safeContract].guardians[currentContract.recoveryRequests[safeContract].newOwners[i]] != 0);
 }
