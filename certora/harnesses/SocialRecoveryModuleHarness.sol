@@ -31,4 +31,28 @@ contract SocialRecoveryModuleHarness is SocialRecoveryModule {
             count++;
         }
     }
+
+    /**
+     * @notice Retrieves the guardian approval count for this particular recovery request at particular nonce.
+     * @param _wallet The target wallet.
+     * @param _newOwners The new owners' addressess.
+     * @param _newThreshold The new threshold for the safe.
+     * @param _nonce The nonce of the recovery request.
+     * @return approvalCount The wallet's current recovery request
+     */
+    function getRecoveryApprovalsWithNonce(
+        address _wallet,
+        address[] calldata _newOwners,
+        uint256 _newThreshold,
+        uint256 _nonce
+    ) public view returns (uint256 approvalCount) {
+        bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
+        address[] memory guardians = getGuardians(_wallet);
+        approvalCount = 0;
+        for (uint256 i = 0; i < guardians.length; i++) {
+            if (confirmedHashes[recoveryHash][guardians[i]]) {
+                approvalCount++;
+            }
+        }
+    }    
 }

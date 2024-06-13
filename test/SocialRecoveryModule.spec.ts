@@ -715,4 +715,19 @@ describe("SocialRecoveryModule", async () => {
       expect(await account.getThreshold()).to.eq(2);
     });
   });
+  describe("Invalidate Nonce", async () => {
+    it("allows invalidating a nonce of a recovery", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, [newOwner1.address], 1, false]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await expect(socialRecoveryModule.executeRecovery.staticCall(account.target, [newOwner1.address], 1)).to.not.be.reverted;
+      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "NonceInvalidated");
+      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: confirmed signatures less than threshold",
+      );
+    });
+  });
 });

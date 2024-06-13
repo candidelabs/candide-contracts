@@ -10,6 +10,7 @@ methods {
     function nonce(address) external returns (uint256) envfree;
     function getRecoveryHash(address, address[], uint256, uint256) external returns (bytes32) envfree;
     function getRecoveryApprovals(address, address[], uint256) external returns (uint256) envfree;
+    function getRecoveryApprovalsWithNonce(address, address[], uint256, uint256) external returns (uint256) envfree;
     function countGuardians(address) external returns (uint256) envfree;
     function getGuardians(address) external returns (address[]) envfree;
     function hasGuardianApproved(address, address, address[], uint256) external returns (bool) envfree;
@@ -446,4 +447,22 @@ rule finalizeRecovery(env e) {
         require_uint64(e.block.timestamp) < executeAfter ||
         (exists uint256 i. currentContract.recoveryRequests[safeContract].newOwners[i] != SENTINEL() &&
         currentContract.entries[safeContract].guardians[currentContract.recoveryRequests[safeContract].newOwners[i]] != 0);
+}
+
+// This rule verifies that the safe can invalidate a nonce which results in invalidating any recovery request with that nonce.
+rule invalidatingNonceInRecovery(env e, address guardian, address[] newOwners, uint256 newThreshold) {
+    require e.msg.sender == safeContract;
+    require currentContract.nonce(safeContract) < max_uint256;
+    // It should not be possible to create a recovery request with a nonce higher than the current one.
+    require currentContract.getRecoveryApprovalsWithNonce(safeContract, newOwners, newThreshold, require_uint256(currentContract.nonce(safeContract) + 1)) == 0;
+
+    storage init = lastStorage;
+
+    currentContract.executeRecovery@withrevert(e, safeContract, newOwners, newThreshold);
+    bool success = !lastReverted;
+
+    currentContract.invalidateNonce@withrevert(e) at init;
+    currentContract.executeRecovery@withrevert(e, safeContract, newOwners, newThreshold);
+    bool isReverted = lastReverted;
+    assert success => isReverted;
 }

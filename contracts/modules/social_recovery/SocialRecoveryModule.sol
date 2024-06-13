@@ -48,6 +48,7 @@ contract SocialRecoveryModule is GuardianStorage {
     );
     event RecoveryFinalized(address indexed wallet, address[] indexed newOwners, uint256 newThreshold, uint256 nonce);
     event RecoveryCanceled(address indexed wallet, uint256 nonce);
+    event NonceInvalidated(address indexed wallet, uint256 nonce);
 
     /**
      * @notice Throws if there is no ongoing recovery request.
@@ -292,6 +293,18 @@ contract SocialRecoveryModule is GuardianStorage {
     function cancelRecovery() external whenRecovery(msg.sender) {
         delete recoveryRequests[msg.sender];
         emit RecoveryCanceled(msg.sender, walletsNonces[msg.sender] - 1);
+    }
+
+    /**
+     * @notice Invalidates the wallet's nonce. This will invalidate existing
+     * recovery confirmations from guardians and can be used either to cancel
+     * the process of collecting confirmations from guardians or when rotating
+     * the guardian configuration to prevent "shadow" confirmations.
+     * @dev This function should only be used between initiation and execution of a recovery.
+     */
+    function invalidateNonce() external {
+        walletsNonces[msg.sender]++;
+        emit NonceInvalidated(msg.sender, walletsNonces[msg.sender] - 1);
     }
 
     /**
