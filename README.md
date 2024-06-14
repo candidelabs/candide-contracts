@@ -52,6 +52,9 @@ We assume that the signer key belongs to its real owner. The probability of the 
 | `cancelRecovery`              | X      |          |        | Lets an owner cancel an ongoing recovery request                                                |
 | `finalizeRecovery`            |        |          |   X    | Finalizes an ongoing recovery request if the recovery period is over. The method is public and callable by anyone |
 
+## Audit
+
+- [For version 0.0.1 by Ackee Blockchain](./audit/ackee-blockchain-candide-social-recovery-report.pdf)
 
 # Development
 
