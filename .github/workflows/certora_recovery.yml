@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rule: ['SocialRecoveryModule', "GuardianStorage"]
+        rule: ['SocialRecoveryModule', 'GuardianStorage', 'RecoveryConfirmationSignatureValidity']
 
     steps:
       - uses: actions/checkout@v4

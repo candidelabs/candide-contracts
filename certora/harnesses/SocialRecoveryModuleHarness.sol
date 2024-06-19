@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.12 <0.9.0;
 import {SocialRecoveryModule} from "../../contracts/modules/social_recovery/SocialRecoveryModule.sol";
-import {IGuardianStorage} from "../../contracts/modules/social_recovery/storage/IGuardianStorage.sol";
 
 contract SocialRecoveryModuleHarness is SocialRecoveryModule {
     constructor(uint256 _recoveryPeriod) SocialRecoveryModule(_recoveryPeriod) {}
@@ -33,6 +32,34 @@ contract SocialRecoveryModuleHarness is SocialRecoveryModule {
     }
 
     /**
+     * @notice Verifies a series of signatures associated with a wallet recovery process.
+     *         The function is copied from `multiConfirmRecovery` without the storage modifications.
+     * @dev This function checks the validity and order of signatures for a wallet recovery hash.
+     *      It ensures that all signatures are from the wallet's guardians and that they are in
+     *      ascending order to prevent duplicates. Null signatures must have the sender as the signer and the sender
+     *      must be a guardian.
+     * @param _wallet The address of the wallet being recovered.
+     * @param recoveryHash The hash of the recovery data which needs to be signed by the guardians.
+     * @param _signatures An array of SignatureData structures containing the signer's address and their signature.
+     */
+    function checkSignatures(address _wallet, bytes32 recoveryHash, SignatureData[] memory _signatures) public view {
+        require(_signatures.length > 0, "SM: empty signatures");
+
+        address lastSigner = address(0);
+        for (uint256 i = 0; i < _signatures.length; i++) {
+            SignatureData memory value = _signatures[i];
+            if (value.signature.length == 0) {
+                require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
+                require(msg.sender == value.signer, "SM: null signature should have the signer as the sender");
+            } else {
+                validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
+            }
+            require(value.signer > lastSigner, "SM: duplicate signers/invalid ordering");
+            lastSigner = value.signer;
+        }
+    }
+
+    /**
      * @notice Retrieves the guardian approval count for this particular recovery request at particular nonce.
      * @param _wallet The target wallet.
      * @param _newOwners The new owners' addressess.
@@ -54,5 +81,9 @@ contract SocialRecoveryModuleHarness is SocialRecoveryModule {
                 approvalCount++;
             }
         }
-    }    
+    }
+
+    function compareByteArrays(bytes memory a, bytes memory b) public pure returns (bool) {
+        return keccak256(a) == keccak256(b);
+    }
 }
