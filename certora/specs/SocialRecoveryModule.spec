@@ -441,6 +441,7 @@ rule finalizeRecovery(env e) {
     assert success => require_uint64(e.block.timestamp) >= executeAfter;
     assert !success =>
         safeContract.getOwners().length == 0 ||
+        safeContract.isModuleEnabled(currentContract) ||
         currentContract.walletsNonces[safeContract] == 0 ||
         executeAfter == 0 ||
         e.msg.value != 0 ||
