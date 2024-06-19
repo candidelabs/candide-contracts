@@ -466,7 +466,7 @@ rule invalidatingNonceInRecovery(env e, address guardian, address[] newOwners, u
     bool isReverted = lastReverted;
     assert success => isReverted;
 }
-
+  
 // This rule verifies that the safe can make changes for itself, and not for other safe contracts.
 rule doesNotAffectOtherAccount(env e, method f, calldataarg args, address otherSafeContract) filtered {
     f -> !f.isView
@@ -483,4 +483,28 @@ rule doesNotAffectOtherAccount(env e, method f, calldataarg args, address otherS
     assert isGuardian == currentContract.isGuardian(otherSafeContract, guardian) &&
         threshold == currentContract.threshold(otherSafeContract) &&
         guardiansCount == currentContract.guardiansCount(otherSafeContract);
+}
+
+// This rule verifies that Recovery can be finalized after the delay period.
+// This rule requires other conditions to be met as well:
+// - The recovery request should be initiated (i.e. `executeAfter != 0` and `walletsNonce[safeContract] > 0`).
+// - No ether should be sent with the transaction.
+// - New owner should not be a guardian.
+// - Existing Safe owner count should be more than zero.
+rule finalizeRecoveryAlwaysPossible(env e) {
+    uint64 executeAfter = currentContract.recoveryRequests[safeContract].executeAfter;
+    require currentContract.walletsNonces[safeContract] > 0;
+    require forall uint256 i. i < currentContract.recoveryRequests[safeContract].newOwners.length =>
+            currentContract.recoveryRequests[safeContract].newOwners[i] != SENTINEL() &&
+            currentContract.entries[safeContract].guardians[currentContract.recoveryRequests[safeContract].newOwners[i]] == 0;
+
+    require safeContract.getOwners().length > 0;
+    require e.msg.value == 0;
+    require require_uint64(e.block.timestamp) >= executeAfter;
+    require executeAfter > 0;
+
+    currentContract.finalizeRecovery@withrevert(e, safeContract);
+    bool isReverted = lastReverted;
+
+    assert !isReverted, "legitimate recovery finalization reverted";
 }
