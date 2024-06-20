@@ -22,7 +22,7 @@ methods {
     function safeContract.getThreshold() external returns (uint256) envfree;
 
     // Wildcard Functions
-    function _.execTransactionFromModule(address to, uint256 value, bytes data, Enum.Operation operation) external with (env e) => summarizeSafeExecTransactionFromModule(calledContract, e, to, value, data, operation) expect bool ALL;
+    function _.execTransactionFromModule(address to, uint256 value, bytes data, Enum.Operation operation) external => DISPATCHER(true);
     function _.isModuleEnabled(address module) external => DISPATCHER(false);
     function _.isOwner(address owner) external => DISPATCHER(false);
     function _.getOwners() external => DISPATCHER(false);
@@ -47,14 +47,6 @@ hook Sload uint256 value recoveryRequests[KEY address account].newOwners.length 
 }
 hook Sstore recoveryRequests[KEY address account].newOwners.length uint256 value {
     ghostNewOwnersLength[account] = value;
-}
-
-// A summary function that helps the prover resolve calls to `safeContract`.
-function summarizeSafeExecTransactionFromModule(address callee, env e, address to, uint256 value, bytes data, Enum.Operation operation) returns bool {
-    if (callee == safeContract) {
-        return safeContract.execTransactionFromModule(e, to, value, data, operation);
-    }
-    return _;
 }
 
 // A setup function that requires Safe contract to enable the Social Recovery Module.
@@ -441,7 +433,7 @@ rule finalizeRecovery(env e) {
     assert success => require_uint64(e.block.timestamp) >= executeAfter;
     assert !success =>
         safeContract.getOwners().length == 0 ||
-        safeContract.isModuleEnabled(currentContract) ||
+        !safeContract.isModuleEnabled(currentContract) ||
         currentContract.walletsNonces[safeContract] == 0 ||
         executeAfter == 0 ||
         e.msg.value != 0 ||
@@ -503,6 +495,7 @@ rule finalizeRecoveryAlwaysPossible(env e) {
     require e.msg.value == 0;
     require require_uint64(e.block.timestamp) >= executeAfter;
     require executeAfter > 0;
+    require safeContract.isModuleEnabled(currentContract);
 
     currentContract.finalizeRecovery@withrevert(e, safeContract);
     bool isReverted = lastReverted;

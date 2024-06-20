@@ -4,20 +4,12 @@ methods {
     // Social Recovery Module Functions
     function nonce(address) external returns (uint256) envfree;
     function isGuardian(address, address) external returns (bool) envfree;
-    function compareByteArrays(bytes, bytes) external returns (bool) envfree;
 
     // Social Recovery Module Summaries
     function getRecoveryHash(address, address[] calldata, uint256, uint256) internal returns (bytes32) => CONSTANT;
     // The prover analysis fails in functions with heavy use of assembly code,
     // so we're summarizing the `isValidSignatureNow` function with a ghost function to avoid this issue and timeouts
     function SignatureChecker.isValidSignatureNow(address signer, bytes32 dataHash, bytes memory signature) internal returns (bool) => isValidSignatureNowSummary(signer, dataHash, signature);
-
-    // Wildcard Functions
-    function _.execTransactionFromModule(address to, uint256 value, bytes data, Enum.Operation operation) external => DISPATCHER(false);
-    function _.isModuleEnabled(address module) external => DISPATCHER(false);
-    function _.isOwner(address owner) external => DISPATCHER(false);
-    function _.getOwners() external => DISPATCHER(false);
-    function _._ external => DISPATCH[] default NONDET;
 }
 
 // The prover analysis fails in functions with heavy use of assembly code,
