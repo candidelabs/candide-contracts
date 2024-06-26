@@ -82,4 +82,13 @@ contract SocialRecoveryModuleHarness is SocialRecoveryModule {
             }
         }
     }
+
+    /**
+     * @notice Returns the hash of all the guardians of a wallet.
+     * @param _wallet The target wallet.
+     * @return guardiansHash The hash of all the guardians of a wallet.
+     */
+    function guardiansHash(address _wallet) public view returns (bytes32) {
+        return keccak256(abi.encodePacked(getGuardians(_wallet)));
+    }
 }

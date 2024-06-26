@@ -14,6 +14,7 @@ methods {
     function countGuardians(address) external returns (uint256) envfree;
     function getGuardians(address) external returns (address[]) envfree;
     function hasGuardianApproved(address, address, address[], uint256) external returns (bool) envfree;
+    function guardiansHash(address) external returns (bytes32) envfree;
 
     // Safe Functions
     function safeContract.isModuleEnabled(address module) external returns (bool) envfree;
@@ -501,4 +502,132 @@ rule finalizeRecoveryAlwaysPossible(env e) {
     bool isReverted = lastReverted;
 
     assert !isReverted, "legitimate recovery finalization reverted";
+}
+
+// This rule verifies that if recovery request data is changed, it must be one of the following functions:
+// - confirmRecovery(...)
+// - multiConfirmRecovery(...)
+// - executeRecovery(...)
+// - finalizeRecovery(...)
+// - cancelRecovery(...)
+// Each of these either updates or deletes the recovery request.
+rule recoveryRequestsChange(method f) {
+    uint i;
+    uint256 guardianApprovalCountBefore = currentContract.recoveryRequests[safeContract].guardiansApprovalCount;
+    uint256 newThresholdBefore = currentContract.recoveryRequests[safeContract].newThreshold;
+    uint64 executeAfterBefore = currentContract.recoveryRequests[safeContract].executeAfter;
+    address newOwnersBefore = currentContract.recoveryRequests[safeContract].newOwners[i];
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint256 guardianApprovalCountAfter = currentContract.recoveryRequests[safeContract].guardiansApprovalCount;
+    uint256 newThresholdAfter = currentContract.recoveryRequests[safeContract].newThreshold;
+    uint64 executeAfterAfter = currentContract.recoveryRequests[safeContract].executeAfter;
+    address newOwnersAfter = currentContract.recoveryRequests[safeContract].newOwners[i];
+
+    assert (
+        guardianApprovalCountBefore != guardianApprovalCountAfter ||
+        newThresholdBefore != newThresholdAfter ||
+        executeAfterBefore != executeAfterAfter ||
+        newOwnersBefore != newOwnersAfter
+    ) =>
+        f.selector == sig:confirmRecovery(address,address[],uint256,bool).selector ||
+        f.selector == sig:multiConfirmRecovery(address,address[],uint256,SocialRecoveryModule.SignatureData[],bool).selector ||
+        f.selector == sig:executeRecovery(address,address[],uint256).selector ||
+        f.selector == sig:finalizeRecovery(address).selector ||
+        f.selector == sig:cancelRecovery().selector;
+}
+
+// This rule verifies that is the confirmedHashes change, it must be one of the following functions:
+// - confirmRecovery(...)
+// - multiConfirmRecovery(...)
+rule confirmedHashesChange(method f, bytes32 hash, address guardian) {
+    bool confirmedHashBefore = currentContract.confirmedHashes[hash][guardian];
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    bool confirmedHashAfter = currentContract.confirmedHashes[hash][guardian];
+
+    assert confirmedHashBefore != confirmedHashAfter =>
+        f.selector == sig:confirmRecovery(address,address[],uint256,bool).selector ||
+        f.selector == sig:multiConfirmRecovery(address,address[],uint256,SocialRecoveryModule.SignatureData[],bool).selector;
+}
+
+// This rule verifies that is the walletsNonces change, it must be one of the following functions:
+// - confirmRecovery(...)
+// - multiConfirmRecovery(...)
+// - executeRecovery(...)
+// - invalidateNonce(...)
+rule walletsNoncesChange(method f) {
+    uint256 walletsNoncesBefore = currentContract.walletsNonces[safeContract];
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint256 walletsNoncesAfter = currentContract.walletsNonces[safeContract];
+
+    assert walletsNoncesBefore != walletsNoncesAfter =>
+        f.selector == sig:confirmRecovery(address,address[],uint256,bool).selector ||
+        f.selector == sig:multiConfirmRecovery(address,address[],uint256,SocialRecoveryModule.SignatureData[],bool).selector ||
+        f.selector == sig:executeRecovery(address,address[],uint256).selector ||
+        f.selector == sig:invalidateNonce().selector;
+}
+
+// This rule verifies that the recovery period never changes.
+rule recoveryPeriodNeverChange(method f) {
+    uint256 recoveryPeriodBefore = currentContract.recoveryPeriod;
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint256 recoveryPeriodAfter = currentContract.recoveryPeriod;
+
+    assert recoveryPeriodBefore == recoveryPeriodAfter;
+}
+
+// This rule verifies that the guardians list and count can only be changed by the following functions:
+// - addGuardianWithThreshold(...)
+// - revokeGuardianWithThreshold(...)
+rule guardiansListAndCountChange(method f) {
+    bytes32 guardiansHashBefore = currentContract.guardiansHash(safeContract);
+    uint256 guardiansCountBefore = currentContract.guardiansCount(safeContract);
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    bytes32 guardiansHashAfter = currentContract.guardiansHash(safeContract);
+    uint256 guardiansCountAfter = currentContract.guardiansCount(safeContract);
+
+    assert (
+        guardiansHashBefore != guardiansHashAfter ||
+        guardiansCountBefore != guardiansCountAfter
+    ) =>
+        f.selector == sig:addGuardianWithThreshold(address,uint256).selector ||
+        f.selector == sig:revokeGuardianWithThreshold(address,address,uint256).selector;
+}
+
+// This rule verifies that the guardian threshold can only be changed by the following functions:
+// - addGuardianWithThreshold(...)
+// - revokeGuardianWithThreshold(...)
+// - changeThreshold(...)
+rule guardiansThresholdChange(method f) {
+    uint256 guardianThresholdBefore = currentContract.threshold(safeContract);
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint256 guardianThresholdAfter = currentContract.threshold(safeContract);
+
+    assert guardianThresholdBefore != guardianThresholdAfter =>
+        f.selector == sig:addGuardianWithThreshold(address,uint256).selector ||
+        f.selector == sig:revokeGuardianWithThreshold(address,address,uint256).selector ||
+        f.selector == sig:changeThreshold(uint256).selector;
 }
