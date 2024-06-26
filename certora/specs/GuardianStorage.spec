@@ -17,6 +17,38 @@
 
 using SafeHarness as safeContract;
 
+// Express the next relation from the reach relation by stating that it is reachable and there is no other element
+// in between.
+// This is equivalent to P_next from Table 3.
+definition isSucc(address wallet, address a, address b) returns bool = ghostReach(wallet, a, b) && a != b && (forall address Z. ghostReach(wallet, a, Z) && ghostReach(wallet, Z, b) => (a == Z || b == Z));
+definition nextOrNull(address n) returns address = n == SENTINEL ? NULL : n;
+
+// State that the guardians storage pointers correspond to the next relation, except for the SENTINEL tail marker.
+definition reachSucc(address wallet, address key, address next) returns bool =
+        (key != NULL && isSucc(wallet, key, nextOrNull(next))) ||
+        (key == NULL && next == NULL && (forall address Z. ghostReach(wallet, key, Z) => Z == NULL));
+
+// Update the reach relation when the next pointer of a is changed to b.
+// This corresponds to the first two equations in Table 3 [1] (destructive update to break previous paths through a and
+// then additionally allow the path to go through the new edge from a to b).
+definition updateSucc(address wallet, address a, address b) returns bool =
+   forall address W. forall address X. forall address Y. ghostReach@new(W, X, Y) ==
+            (X == Y ||
+            (ghostReach@old(W, X, Y) && !(W == wallet && ghostReach@old(W, X, a) && a != Y && ghostReach@old(W, a, Y))) ||
+            (W == wallet && ghostReach@old(W, X, a) && ghostReach@old(W, b, Y)));
+
+// A definition that returns the successor count for a given guardian and the wallet.
+definition countExpected(address wallet, address key) returns mathint =
+    ghostGuardians[wallet][key] == NULL ? 0 : ghostGuardians[wallet][key] == SENTINEL ? 1 : ghostSuccCount(wallet, ghostGuardians[wallet][key]) + 1;
+
+// A definition that returns true if successor count for a guardian for a wallet is more than two if guardian is not NULL and not SENTINEL.
+definition countSuccessor(address wallet, address key) returns bool = 
+    (ghostGuardians[wallet][key] != NULL && ghostGuardians[wallet][key] != SENTINEL => ghostSuccCount(wallet,key) >= 2);
+
+// Update the ghostSuccCount for a wallet based on reachablility. If not reachable, old count is retained.
+definition updateGhostSuccCount(address wallet, address key, mathint diff) returns bool = forall address W. forall address X.
+    (ghostSuccCount@new(W, X) == (ghostSuccCount@old(W, X) + (W == wallet && ghostReach(W, X, key) ? diff : 0)));
+
 methods {
     // Safe Functions
     function safeContract.isModuleEnabled(address) external returns (bool) envfree;
@@ -56,6 +88,39 @@ persistent ghost address SENTINEL {
 
 persistent ghost address NULL {
     axiom to_mathint(NULL) == 0;
+}
+
+// Hook to update the ghostGuardians and the reach ghost state whenever the entries field
+// in storage is written.
+// This also checks that the reachSucc invariant is preserved.
+hook Sstore currentContract.entries[KEY address wallet].guardians[KEY address key] address value {
+    assert key != NULL;
+    assert ghostReach(wallet, value, key) => value == SENTINEL, "list is cyclic";
+    ghostGuardians[wallet][key] = value;
+    havoc ghostReach assuming updateSucc(wallet, key, nextOrNull(value));
+    mathint countDiff = countExpected(wallet, key) - ghostSuccCount(wallet, key);
+    havoc ghostSuccCount assuming updateGhostSuccCount(wallet, key, countDiff);
+}
+
+// Hook to update the ghostGuardianCount for given wallet address
+hook Sstore currentContract.entries[KEY address wallet].count uint256 value {
+    ghostGuardianCount[wallet] = value;
+}
+
+// Hook to match ghost state and storage state when reading guardians from storage.
+// This also provides the reachSucc invariant.
+hook Sload address value currentContract.entries[KEY address wallet].guardians[KEY address key] {
+    require ghostGuardians[wallet][key] == value;
+    require reachSucc(wallet, key, value);
+    require ghostSuccCount(wallet, key) == countExpected(wallet, key);
+}
+
+// Hook to match ghost state and storage state when reading guardian count from storage.
+hook Sload uint256 value currentContract.entries[KEY address wallet].count {
+    // The prover found a counterexample if the guardians count is max uint256,
+    // but this is not a realistic scenario.
+    require ghostGuardianCount[wallet] < max_uint256;
+    require ghostGuardianCount[wallet] == value;
 }
 
 // Verifies that if the threshold is Zero, then there should be no guardian.
@@ -137,7 +202,7 @@ invariant reachInvariant()
         }
     }
 
-// every element with non-zero guardian field is reachable from SENTINEL (head of the list)
+// Every element with non-zero guardian field is reachable from SENTINEL (head of the list)
 invariant inListReachable()
     (forall address wallet. forall address key. ghostGuardians[wallet][key] != 0 => ghostReach(wallet, SENTINEL, key))
     {
@@ -177,71 +242,6 @@ invariant reachNext()
             requireInvariant reachInvariant();
         }
     }
-
-// Express the next relation from the reach relation by stating that it is reachable and there is no other element
-// in between.
-// This is equivalent to P_next from Table 3.
-definition isSucc(address wallet, address a, address b) returns bool = ghostReach(wallet, a, b) && a != b && (forall address Z. ghostReach(wallet, a, Z) && ghostReach(wallet, Z, b) => (a == Z || b == Z));
-definition nextOrNull(address n) returns address = n == SENTINEL ? NULL : n;
-
-// State that the guardians storage pointers correspond to the next relation, except for the SENTINEL tail marker.
-definition reachSucc(address wallet, address key, address next) returns bool =
-        (key != NULL && isSucc(wallet, key, nextOrNull(next))) ||
-        (key == NULL && next == NULL && (forall address Z. ghostReach(wallet, key, Z) => Z == NULL));
-
-// Update the reach relation when the next pointer of a is changed to b.
-// This corresponds to the first two equations in Table 3 [1] (destructive update to break previous paths through a and
-// then additionally allow the path to go through the new edge from a to b).
-definition updateSucc(address wallet, address a, address b) returns bool =
-   forall address W. forall address X. forall address Y. ghostReach@new(W, X, Y) ==
-            (X == Y ||
-            (ghostReach@old(W, X, Y) && !(W == wallet && ghostReach@old(W, X, a) && a != Y && ghostReach@old(W, a, Y))) ||
-            (W == wallet && ghostReach@old(W, X, a) && ghostReach@old(W, b, Y)));
-
-// A definition that returns the successor count for a given guardian and the wallet.
-definition countExpected(address wallet, address key) returns mathint =
-    ghostGuardians[wallet][key] == NULL ? 0 : ghostGuardians[wallet][key] == SENTINEL ? 1 : ghostSuccCount(wallet, ghostGuardians[wallet][key]) + 1;
-
-// A definition that returns true if successor count for a guardian for a wallet is more than two if guardian is not NULL and not SENTINEL.
-definition countSuccessor(address wallet, address key) returns bool = 
-    (ghostGuardians[wallet][key] != NULL && ghostGuardians[wallet][key] != SENTINEL => ghostSuccCount(wallet,key) >= 2);
-
-// Update the ghostSuccCount for a wallet based on reachablility. If not reachable, old count is retained.
-definition updateGhostSuccCount(address wallet, address key, mathint diff) returns bool = forall address W. forall address X.
-    (ghostSuccCount@new(W, X) == (ghostSuccCount@old(W, X) + (W == wallet && ghostReach(W, X, key) ? diff : 0)));
-
-// hook to update the ghostGuardians and the reach ghost state whenever the entries field
-// in storage is written.
-// This also checks that the reachSucc invariant is preserved.
-hook Sstore currentContract.entries[KEY address wallet].guardians[KEY address key] address value {
-    assert key != NULL;
-    assert ghostReach(wallet, value, key) => value == SENTINEL, "list is cyclic";
-    ghostGuardians[wallet][key] = value;
-    havoc ghostReach assuming updateSucc(wallet, key, nextOrNull(value));
-    mathint countDiff = countExpected(wallet, key) - ghostSuccCount(wallet, key);
-    havoc ghostSuccCount assuming updateGhostSuccCount(wallet, key, countDiff);
-}
-
-// hook to update the ghostGuardianCount for given wallet address
-hook Sstore currentContract.entries[KEY address wallet].count uint256 value {
-    ghostGuardianCount[wallet] = value;
-}
-
-// Hook to match ghost state and storage state when reading guardians from storage.
-// This also provides the reachSucc invariant.
-hook Sload address value currentContract.entries[KEY address wallet].guardians[KEY address key] {
-    require ghostGuardians[wallet][key] == value;
-    require reachSucc(wallet, key, value);
-    require ghostSuccCount(wallet, key) == countExpected(wallet, key);
-}
-
-// Hook to match ghost state and storage state when reading guardian count from storage.
-hook Sload uint256 value currentContract.entries[KEY address wallet].count {
-    // The prover found a counterexample if the guardians count is max uint256,
-    // but this is not a realistic scenario.
-    require ghostGuardianCount[wallet] < max_uint256;
-    require ghostGuardianCount[wallet] == value;
-}
 
 // This invariant verifies that the successor count for each guardian for each wallet is one more than its next successor.
 invariant countCorrect()
@@ -307,6 +307,19 @@ invariant emptyListNotReachable()
             requireInvariant reachHeadNext();
             requireInvariant countCorrect();
             requireInvariant guardianCountCorrect();
+        }
+    }
+
+// Verifies that the countGuardians harness function returns the same value as the ghostGuardianCount & guardiansCount.
+invariant harnessCountGuardiansCorrect(address wallet) 
+    ghostGuardianCount[wallet] == countGuardians(wallet) &&
+    guardiansCount(wallet) == countGuardians(wallet)
+    {
+        preserved {
+            requireInvariant reachNull();
+            requireInvariant reachInvariant();
+            requireInvariant inListReachable();
+            requireInvariant reachableInList();
         }
     }
 
@@ -407,15 +420,3 @@ rule removeGuardianChangesGuardians {
     assert !isGuardian(safeContract, toRemove), "revokeGuardian should remove the given guardian";
     assert isGuardian(safeContract, other) == isGuardianOtherBefore, "revokeGuardian should not remove or add other guardians";
 }
-
-invariant harnessCountGuardiansCorrect(address wallet) 
-    ghostGuardianCount[wallet] == countGuardians(wallet) &&
-    guardiansCount(wallet) == countGuardians(wallet)
-    {
-        preserved {
-            requireInvariant reachNull();
-            requireInvariant reachInvariant();
-            requireInvariant inListReachable();
-            requireInvariant reachableInList();
-        }
-    }
