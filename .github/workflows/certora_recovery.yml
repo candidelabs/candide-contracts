@@ -8,8 +8,30 @@ on:
     branches:
       - main
 
+env:
+  CERTORAKEY: ${{ secrets.CERTORA_KEY }}
+
 jobs:
+  check-secret:
+    runs-on: ubuntu-latest
+    outputs:
+      certora-key-exists: ${{ steps.certora-key-check.outputs.defined }}
+    steps:
+      - name: Check for Certora Secret availability
+        id: certora-key-check
+        # perform secret check & put boolean result as an output
+        run: |
+          if [[ -n "${CERTORAKEY}" ]]; then
+            echo "defined=true" >> $GITHUB_OUTPUT;
+            echo "CERTORA_KEY exists"
+          else
+            echo "defined=false" >> $GITHUB_OUTPUT;
+            echo "CERTORA_KEY does not exist"
+          fi
+
   verify:
+    needs: [check-secret]
+    if: needs.check-secret.outputs.certora-key-exists == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -43,7 +65,4 @@ jobs:
 
       - name: Verify rule ${{ matrix.rule }}
         run: |
-          echo "Certora key length" ${#CERTORAKEY}
           certoraRun certora/conf/${{ matrix.rule }}.conf --wait_for_results=all
-        env:
-          CERTORAKEY: ${{ secrets.CERTORA_KEY }}
