@@ -25,7 +25,6 @@
     "build:ts": "yarn rimraf dist && tsc -p tsconfig.prod.json"
   },
   "devDependencies": {
-    "@account-abstraction": "git+https://github.com/eth-infinitism/account-abstraction.git#v0.6.0",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-foundry": "^1.1.1",
@@ -35,9 +34,7 @@
     "@nomicfoundation/hardhat-ignition": "^0.15.1",
     "@nomicfoundation/ignition-core": "^0.15.1",
     "@nomicfoundation/hardhat-verify": "^1.0.0",
-    "@openzeppelin/contracts": "^4.9.1",
     "@safe-global/mock-contract": "^4.1.0",
-    "@safe-global/safe-contracts": "^1.4.1-build.0",
     "@safe-global/safe-singleton-factory": "^1.0.14",
     "@typechain/ethers-v6": "^0.4.0",
     "@typechain/hardhat": "^8.0.0",
@@ -67,5 +64,10 @@
     "typechain": "^8.2.0",
     "typescript": "~5.0.0",
     "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "@account-abstraction": "git+https://github.com/eth-infinitism/account-abstraction.git#v0.6.0",
+    "@openzeppelin/contracts": "^4.9.1",
+    "@safe-global/safe-contracts": "^1.4.1-build.0"
   }
 }
