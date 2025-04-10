@@ -14,7 +14,7 @@ contract GuardianStorage is IGuardianStorage {
     address internal constant SENTINEL_GUARDIANS = address(0x1);
 
     struct GuardianStorageEntry {
-        // the list of guardians
+        // the list of guardians, implemented as a linked list with a sentinel
         mapping(address => address) guardians;
         // guardians count
         uint256 count;
@@ -71,13 +71,9 @@ contract GuardianStorage is IGuardianStorage {
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS, "GS: invalid guardian");
         require(entry.guardians[_prevGuardian] == _guardian, "GS: invalid previous guardian");
         require(entry.count - 1 >= _threshold, "GS: invalid threshold");
-        entry.guardians[_prevGuardian] = entry.guardians[_guardian];
-        entry.guardians[_guardian] = address(0);
-        entry.count--;
-        emit GuardianRevoked(msg.sender, _guardian);
-        if (entry.threshold != _threshold){
-            _changeThreshold(msg.sender, _threshold);
-        }
+        
+        // Delegate the removal logic to the common internal function.
+        _removeGuardian(msg.sender, _prevGuardian, _guardian, _threshold);
     }
 
     /**
@@ -128,7 +124,7 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
-     * @dev Gets the list of guaridans for a wallet.
+     * @dev Gets the list of guardians for a wallet.
      * @param _wallet The target wallet.
      * @return address[] list of guardians.
      */
@@ -149,4 +145,43 @@ contract GuardianStorage is IGuardianStorage {
         return array;
     }
 
+    /**
+     * @dev Allows a guardian to remove itself from a wallet and change the threshold.
+     * @param _wallet The target wallet from which the guardian is removing itself.
+     * @param _threshold New threshold after removal.
+     *
+     * This function first verifies that the caller is a guardian for the given wallet.
+     * Then it traverses the linked list to find the previous guardian pointer
+     * and removes the caller from the list.
+     */
+    function removeSelfGuardian(address _wallet, uint256 _threshold) external {
+        GuardianStorageEntry storage entry = entries[_wallet];
+        require(isGuardian(_wallet, msg.sender), "GS: caller is not a guardian");
+
+        // Find the previous guardian in the linked list.
+        address prevGuardian = SENTINEL_GUARDIANS;
+        while (entry.guardians[prevGuardian] != msg.sender) {
+            prevGuardian = entry.guardians[prevGuardian];
+            require(prevGuardian != SENTINEL_GUARDIANS, "GS: guardian not found");
+        }
+        
+        require(entry.count - 1 >= _threshold, "GS: invalid threshold");
+
+        // Delegate the removal logic to the helper.
+        _removeGuardian(_wallet, prevGuardian, msg.sender, _threshold);
+    }
+
+    // Internal helper to remove a guardian from the linked list.
+    function _removeGuardian(address _wallet, address _prevGuardian, address _guardian, uint256 _threshold) internal {
+        GuardianStorageEntry storage entry = entries[_wallet];
+        // Remove the guardian:
+        entry.guardians[_prevGuardian] = entry.guardians[_guardian];
+        entry.guardians[_guardian] = address(0);
+        entry.count--;
+        emit GuardianRevoked(_wallet, _guardian);
+        // Update threshold if required.
+        if (entry.threshold != _threshold) {
+            _changeThreshold(_wallet, _threshold);
+        }
+    }
 }

@@ -35,8 +35,8 @@ contract SocialRecoveryModule is GuardianStorage {
     mapping(bytes32 => mapping(address => bool)) internal confirmedHashes;
     mapping(address => uint256) internal walletsNonces;
 
-    // Recovery period
-    uint256 internal immutable recoveryPeriod;
+    // Recovery period per wallet
+    mapping(address => uint256) internal recoveryPeriods;
 
     event RecoveryExecuted(
         address indexed wallet,
@@ -58,9 +58,7 @@ contract SocialRecoveryModule is GuardianStorage {
         _;
     }
 
-    constructor(uint256 _recoveryPeriod) {
-        recoveryPeriod = _recoveryPeriod;
-    }
+    constructor() {}
 
     ////////////////
 

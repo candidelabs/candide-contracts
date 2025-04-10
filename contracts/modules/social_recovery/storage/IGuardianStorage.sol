@@ -5,13 +5,15 @@ interface IGuardianStorage {
     /**
      * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
      * @param _guardian The guardian to add.
+     * @param _threshold New threshold after addition.
      */
     function addGuardianWithThreshold(address _guardian, uint256 _threshold) external;
 
     /**
      * @dev Lets an authorised module revoke a guardian from a wallet and change the threshold.
-     * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list
+     * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list.
      * @param _guardian The guardian to revoke.
+     * @param _threshold New threshold after removal.
      */
     function revokeGuardianWithThreshold(address _prevGuardian, address _guardian, uint256 _threshold) external;
 
@@ -49,4 +51,11 @@ interface IGuardianStorage {
      * @return address[] Array of guardians.
      */
     function getGuardians(address _wallet) external view returns (address[] memory);
+
+    /**
+     * @dev Allows a guardian to remove itself from a wallet and change the threshold.
+     * @param _wallet The target wallet from which the guardian is removing itself.
+     * @param _threshold New threshold after removal.
+     */
+    function removeSelfGuardian(address _wallet, uint256 _threshold) external;
 }
