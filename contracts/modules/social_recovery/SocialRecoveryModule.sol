@@ -117,6 +117,27 @@ contract SocialRecoveryModule is GuardianStorage {
     }
 
     /**
+     * @dev Validates a proposed owner set and threshold before a confirmation is recorded or a recovery
+     * request is scheduled. A request that `finalizeRecovery` would always reject must never be scheduled,
+     * as it could otherwise only be cleared by the (possibly unavailable) wallet owners.
+     * @param _wallet The target wallet.
+     * @param _newOwners The new owners' addresses.
+     * @param _newThreshold The new threshold for the safe.
+     */
+    function _validateNewOwners(address _wallet, address[] calldata _newOwners, uint256 _newThreshold) internal view {
+        require(_newOwners.length > 0, "SM: owners cannot be empty");
+        require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
+        for (uint256 i = 0; i < _newOwners.length; i++) {
+            address newOwner = _newOwners[i];
+            require(newOwner != address(0) && newOwner != SENTINEL_OWNERS && newOwner != _wallet, "SM: invalid new owner");
+            require(!isGuardian(_wallet, newOwner), "SM: new owner cannot be guardian");
+            for (uint256 j = 0; j < i; j++) {
+                require(newOwner != _newOwners[j], "SM: duplicate new owner");
+            }
+        }
+    }
+
+    /**
      * @notice Lets single guardian confirm the execution of the recovery request.
      * Can also trigger the start of the execution by passing true to '_execute' parameter.
      * Once triggered the recovery is pending for the recovery period before it can be finalised.
@@ -127,8 +148,7 @@ contract SocialRecoveryModule is GuardianStorage {
      */
     function confirmRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, bool _execute) external {
         require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
-        require(_newOwners.length > 0, "SM: owners cannot be empty");
-        require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
+        _validateNewOwners(_wallet, _newOwners, _newThreshold);
         //
         uint256 _nonce = nonce(_wallet);
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
@@ -158,8 +178,7 @@ contract SocialRecoveryModule is GuardianStorage {
         SignatureData[] memory _signatures,
         bool _execute
     ) external {
-        require(_newOwners.length > 0, "SM: owners cannot be empty");
-        require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
+        _validateNewOwners(_wallet, _newOwners, _newThreshold);
         require(_signatures.length > 0, "SM: empty signatures");
         uint256 guardiansThreshold = threshold(_wallet);
         require(guardiansThreshold > 0, "SM: empty guardians");
@@ -194,6 +213,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * @param _newThreshold The new threshold for the safe.
      */
     function executeRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold) external {
+        _validateNewOwners(_wallet, _newOwners, _newThreshold);
         uint256 guardiansThreshold = threshold(_wallet);
         require(guardiansThreshold > 0, "SM: empty guardians");
         //
