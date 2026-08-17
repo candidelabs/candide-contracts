@@ -181,6 +181,94 @@ describe("SocialRecoveryModule", async () => {
       );
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new threshold");
     });
+    it("reverts if a new owner is the zero address", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [newOwner1.address, ADDRESS_ZERO],
+        1,
+        [guardian1],
+        false,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner is the sentinel address", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [newOwner1.address, SENTINEL_ADDRESS],
+        1,
+        [guardian1],
+        false,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner is the wallet itself", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [newOwner1.address, await account.getAddress()],
+        1,
+        [guardian1],
+        false,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner is a guardian", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      const data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [newOwner1.address, guardian2.address],
+        1,
+        [guardian1],
+        false,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: new owner cannot be guardian",
+      );
+    });
+    it("reverts if new owners contain duplicates", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [newOwner1.address, newOwner2.address, newOwner1.address],
+        1,
+        [guardian1],
+        false,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: duplicate new owner");
+    });
     it("reverts if signatures field is empty", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -432,6 +520,64 @@ describe("SocialRecoveryModule", async () => {
       ]);
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new threshold");
     });
+    it("reverts if a new owner is the zero address", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [
+        account.target,
+        [newOwner1.address, ADDRESS_ZERO],
+        1,
+        false,
+      ]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner is the sentinel address", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [
+        account.target,
+        [newOwner1.address, SENTINEL_ADDRESS],
+        1,
+        false,
+      ]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner is the wallet itself", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [
+        account.target,
+        [newOwner1.address, account.target],
+        1,
+        false,
+      ]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner is a guardian", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [
+        account.target,
+        [newOwner1.address, guardian2.address],
+        1,
+        false,
+      ]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: new owner cannot be guardian",
+      );
+    });
+    it("reverts if new owners contain duplicates", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [
+        account.target,
+        [newOwner1.address, newOwner2.address, newOwner1.address],
+        1,
+        false,
+      ]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: duplicate new owner");
+    });
     it("reverts if approvals are less than threshold", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -495,6 +641,28 @@ describe("SocialRecoveryModule", async () => {
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
         "SM: confirmed signatures less than threshold",
       );
+    });
+    it("reverts if new owners are invalid", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [
+        account.target,
+        [newOwner1.address, ADDRESS_ZERO],
+        1,
+      ]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid new owner");
+    });
+    it("reverts if a new owner became a guardian after confirmation", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, newOwner1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: new owner cannot be guardian",
+      );
+      const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
+      expect(recoveryRequest.executeAfter).to.eq(0);
     });
     it("can not replace existing recovery if new one doesn't have more approvals", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -728,6 +896,51 @@ describe("SocialRecoveryModule", async () => {
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
         "SM: confirmed signatures less than threshold",
       );
+    });
+  });
+  describe("Recovery Request Validation", async () => {
+    it("guardians can still recover after trying to schedule a request naming a guardian as new owner", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian3.address, 3);
+      // every guardian approves a request that names guardian1 as the new owner: it is rejected before anything is recorded
+      let data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [guardian1.address],
+        1,
+        [guardian1, guardian2, guardian3],
+        true,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: new owner cannot be guardian",
+      );
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [guardian1.address], 1)).to.eq(0);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
+      // a corrected request can still be scheduled with the same approval count and finalized
+      data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        [newOwner1.address],
+        1,
+        [guardian1, guardian2, guardian3],
+        true,
+        false,
+        false,
+        false,
+        undefined,
+      );
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.emit(socialRecoveryModule, "RecoveryExecuted");
+      await time.increase(3601);
+      data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryFinalized");
+      expect(await account.getOwners()).to.deep.eq([newOwner1.address]);
+      expect(await account.getThreshold()).to.eq(1);
     });
   });
 });
