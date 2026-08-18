@@ -168,7 +168,9 @@ contract SocialRecoveryModule is GuardianStorage {
      * @param _wallet The target wallet.
      * @param _newOwners The new owners' addressess.
      * @param _newThreshold The new threshold for the safe.
-     * @param _signatures The guardians signatures.
+     * @param _signatures The guardian signatures, sorted by ascending signer address. Each entry is either an ECDSA
+     * signature, an EIP-1271 contract signature (which may be empty, e.g. for a hash pre-approved by a Safe guardian),
+     * or an empty signature whose signer is the sender, which counts as a direct confirmation by the sender.
      * @param _execute Whether to auto-start execution of recovery.
      */
     function multiConfirmRecovery(
@@ -188,9 +190,8 @@ contract SocialRecoveryModule is GuardianStorage {
         address lastSigner = address(0);
         for (uint256 i = 0; i < _signatures.length; i++) {
             SignatureData memory value = _signatures[i];
-            if (value.signature.length == 0) {
+            if (value.signer == msg.sender && value.signature.length == 0) {
                 require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
-                require(msg.sender == value.signer, "SM: null signature should have the signer as the sender");
             } else {
                 validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
             }

@@ -380,7 +380,7 @@ describe("SocialRecoveryModule", async () => {
       );
       await expect(notGuardian.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: sender not a guardian");
     });
-    it("reverts if empty signature is not transaction sender", async () => {
+    it("reverts if relayed empty signature belongs to an EOA guardian", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
@@ -397,7 +397,7 @@ describe("SocialRecoveryModule", async () => {
         guardian2,
       );
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
-        "SM: null signature should have the signer as the sender",
+        "SM: Invalid guardian signature",
       );
     });
     it("reverts if approvals is less than threshold and execute is true", async () => {
