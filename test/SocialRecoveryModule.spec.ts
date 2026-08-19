@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import hre, { ethers } from "hardhat";
 import { expect } from "chai";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { SocialRecoveryModule, TestExecutor } from "../typechain-types";
+import { SignMessageLib, SocialRecoveryModule, TestExecutor } from "../typechain-types";
 import { BigNumber } from "@ethersproject/bignumber";
 import { getEIP712Domain, getEIP712Message, getEIP712Types } from "./utils/eip712_helper";
 
@@ -111,6 +111,25 @@ describe("SocialRecoveryModule", async () => {
       );
       await sender.sendTransaction({ to: socialRecoveryModule.target, data });
     }
+  }
+
+  async function _deploySafeGuardian(owner: SignerWithAddress) {
+    const fallbackHandler = await ethers.deployContract("CompatibilityFallbackHandler", [], { signer: deployer });
+    const signMessageLib = await ethers.deployContract("SignMessageLib", [], { signer: deployer });
+    const safeGuardian = await ethers.deployContract("TestExecutor", [], { signer: deployer });
+    // the deployer is enabled as a module so that tests can make the Safe guardian delegatecall into SignMessageLib
+    await safeGuardian.testSetup([owner.address], 1, fallbackHandler.target, [deployer.address]);
+    return { safeGuardian, signMessageLib };
+  }
+
+  async function _safeGuardianApproveHash(safeGuardian: TestExecutor, signMessageLib: SignMessageLib, hash: string) {
+    const message = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32"], [hash]);
+    const data = signMessageLib.interface.encodeFunctionData("signMessage", [message]);
+    await safeGuardian.connect(deployer).execTransactionFromModule(signMessageLib.target, 0, data, 1);
+  }
+
+  function _sortSignatures(signatures: SocialRecoveryModule.SignatureDataStruct[]) {
+    return signatures.sort((a, b) => (BigInt(a.signer as string) < BigInt(b.signer as string) ? -1 : 1));
   }
 
   describe("Multi Confirm Recovery", async () => {
@@ -399,6 +418,86 @@ describe("SocialRecoveryModule", async () => {
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
         "SM: Invalid guardian signature",
       );
+    });
+    it("reverts if relayed empty signature belongs to a Safe that is not a guardian", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const { safeGuardian, signMessageLib } = await _deploySafeGuardian(guardian2);
+      const newOwners = [newOwner1.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 1, nonce);
+      await _safeGuardianApproveHash(safeGuardian, signMessageLib, recoveryHash);
+      const data = socialRecoveryModule.interface.encodeFunctionData("multiConfirmRecovery", [
+        account.target,
+        newOwners,
+        1,
+        [{ signer: safeGuardian.target, signature: "0x" }],
+        false,
+      ]);
+      await expect(notGuardian.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: Signer not a guardian");
+    });
+    it("reverts if relayed empty signature belongs to a Safe guardian that did not pre-approve the recovery hash", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const { safeGuardian } = await _deploySafeGuardian(guardian2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, await safeGuardian.getAddress(), 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("multiConfirmRecovery", [
+        account.target,
+        [newOwner1.address],
+        1,
+        [{ signer: safeGuardian.target, signature: "0x" }],
+        false,
+      ]);
+      await expect(notGuardian.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: Invalid guardian signature",
+      );
+    });
+    it("reverts if relayed empty signature belongs to a Safe guardian that pre-approved a different recovery hash", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const { safeGuardian, signMessageLib } = await _deploySafeGuardian(guardian2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, await safeGuardian.getAddress(), 1);
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const otherHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner2.address], 1, nonce);
+      await _safeGuardianApproveHash(safeGuardian, signMessageLib, otherHash);
+      const data = socialRecoveryModule.interface.encodeFunctionData("multiConfirmRecovery", [
+        account.target,
+        [newOwner1.address],
+        1,
+        [{ signer: safeGuardian.target, signature: "0x" }],
+        false,
+      ]);
+      await expect(notGuardian.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: Invalid guardian signature",
+      );
+    });
+    it("allows a relayer to submit an empty signature for a Safe guardian that pre-approved the recovery hash", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const { safeGuardian, signMessageLib } = await _deploySafeGuardian(guardian2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, await safeGuardian.getAddress(), 2);
+      const newOwners = [newOwner1.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 1, nonce);
+      await _safeGuardianApproveHash(safeGuardian, signMessageLib, recoveryHash);
+      const guardian1Signature = await guardian1.signTypedData(
+        await getEIP712Domain(socialRecoveryModule),
+        getEIP712Types(),
+        await getEIP712Message(account, newOwners, 1, nonce),
+      );
+      const signatures = _sortSignatures([
+        { signer: guardian1.address, signature: guardian1Signature },
+        { signer: await safeGuardian.getAddress(), signature: "0x" },
+      ]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("multiConfirmRecovery", [
+        account.target,
+        newOwners,
+        1,
+        signatures,
+        false,
+      ]);
+      await notGuardian.sendTransaction({ to: socialRecoveryModule.target, data });
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, newOwners, 1)).to.eq(2);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, safeGuardian.target, newOwners, 1)).to.eq(true);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, newOwners, 1)).to.eq(true);
     });
     it("reverts if approvals is less than threshold and execute is true", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
