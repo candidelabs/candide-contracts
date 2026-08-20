@@ -27,6 +27,7 @@ contract SocialRecoveryModule is GuardianStorage {
     struct RecoveryRequest {
         uint256 guardiansApprovalCount;
         uint256 newThreshold;
+        uint256 nonce;
         uint64 executeAfter;
         address[] newOwners;
     }
@@ -229,12 +230,13 @@ contract SocialRecoveryModule is GuardianStorage {
         RecoveryRequest storage request = recoveryRequests[_wallet];
         if (request.executeAfter > 0) {
             require(_approvalCount > request.guardiansApprovalCount, "SM: not enough approvals for replacement");
+            uint256 replacedNonce = request.nonce;
             delete recoveryRequests[_wallet];
-            emit RecoveryCanceled(_wallet, _nonce - 1);
+            emit RecoveryCanceled(_wallet, replacedNonce);
         }
         // Start recovery execution
         uint64 executeAfter = uint64(block.timestamp + recoveryPeriod);
-        recoveryRequests[_wallet] = RecoveryRequest(_approvalCount, _newThreshold, executeAfter, _newOwners);
+        recoveryRequests[_wallet] = RecoveryRequest(_approvalCount, _newThreshold, _nonce, executeAfter, _newOwners);
         walletsNonces[_wallet]++;
         emit RecoveryExecuted(_wallet, _newOwners, _newThreshold, _nonce, executeAfter, _approvalCount);
     }
@@ -249,6 +251,7 @@ contract SocialRecoveryModule is GuardianStorage {
         require(uint64(block.timestamp) >= request.executeAfter, "SM: recovery period still pending");
         address[] memory newOwners = request.newOwners;
         uint256 newThreshold = request.newThreshold;
+        uint256 requestNonce = request.nonce;
         delete recoveryRequests[_wallet];
 
         ISafe safe = ISafe(payable(_wallet));
@@ -305,15 +308,16 @@ contract SocialRecoveryModule is GuardianStorage {
             }
         }
 
-        emit RecoveryFinalized(_wallet, newOwners, newThreshold, walletsNonces[_wallet] - 1);
+        emit RecoveryFinalized(_wallet, newOwners, newThreshold, requestNonce);
     }
 
     /**
      * @notice Lets the owner cancel an ongoing recovery request.
      */
     function cancelRecovery() external whenRecovery(msg.sender) {
+        uint256 requestNonce = recoveryRequests[msg.sender].nonce;
         delete recoveryRequests[msg.sender];
-        emit RecoveryCanceled(msg.sender, walletsNonces[msg.sender] - 1);
+        emit RecoveryCanceled(msg.sender, requestNonce);
     }
 
     /**
