@@ -38,10 +38,21 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
+     * @dev Throws if the calldata does not have the canonical length for the static arguments of the function.
+     * A Safe forwards unknown calls to its fallback handler with the original sender appended to the calldata, so this
+     * rejects wallet-only methods that are reached through the fallback handler instead of being called by the wallet.
+     * @param _argsCount The number of static arguments of the guarded function.
+     */
+    modifier onlyCanonicalCalldata(uint256 _argsCount) {
+        require(msg.data.length == 4 + 32 * _argsCount, "GS: unexpected calldata length");
+        _;
+    }
+
+    /**
      * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
      * @param _guardian The guardian to add.
      */
-    function addGuardianWithThreshold(address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled() {
+    function addGuardianWithThreshold(address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(2) {
         require(_threshold > 0, "GS: threshold cannot be 0");
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS && _guardian != msg.sender, "GS: invalid guardian");
         require(!ISafe(payable(msg.sender)).isOwner(_guardian), "GS: guardian cannot be an owner");
@@ -66,7 +77,11 @@ contract GuardianStorage is IGuardianStorage {
      * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list
      * @param _guardian The guardian to revoke.
      */
-    function revokeGuardianWithThreshold(address _prevGuardian, address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled() {
+    function revokeGuardianWithThreshold(
+        address _prevGuardian,
+        address _guardian,
+        uint256 _threshold
+    ) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(3) {
         GuardianStorageEntry storage entry = entries[msg.sender];
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS, "GS: invalid guardian");
         require(entry.guardians[_prevGuardian] == _guardian, "GS: invalid previous guardian");
@@ -84,7 +99,7 @@ contract GuardianStorage is IGuardianStorage {
      * @dev Allows to update the number of required confirmations by guardians.
      * @param _threshold New threshold.
      */
-    function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled() {
+    function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(1) {
         _changeThreshold(msg.sender, _threshold);
     }
 

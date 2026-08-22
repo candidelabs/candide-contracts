@@ -314,7 +314,7 @@ contract SocialRecoveryModule is GuardianStorage {
     /**
      * @notice Lets the owner cancel an ongoing recovery request.
      */
-    function cancelRecovery() external whenRecovery(msg.sender) {
+    function cancelRecovery() external whenRecovery(msg.sender) onlyCanonicalCalldata(0) {
         uint256 requestNonce = recoveryRequests[msg.sender].nonce;
         delete recoveryRequests[msg.sender];
         emit RecoveryCanceled(msg.sender, requestNonce);
@@ -327,7 +327,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * the guardian configuration to prevent "shadow" confirmations.
      * @dev This function should only be used between initiation and execution of a recovery.
      */
-    function invalidateNonce() external {
+    function invalidateNonce() external onlyCanonicalCalldata(0) {
         walletsNonces[msg.sender]++;
         emit NonceInvalidated(msg.sender, walletsNonces[msg.sender] - 1);
     }
