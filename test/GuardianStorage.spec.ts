@@ -30,6 +30,13 @@ describe("GuardianStorage", async () => {
     return { account, socialRecoveryModule, guardianStorage: socialRecoveryModule };
   }
 
+  async function setupTestsWithModuleAsFallbackHandler() {
+    const socialRecoveryModule = await ethers.deployContract("SocialRecoveryModule", [3600], { signer: deployer });
+    const account = await hre.ethers.deployContract("TestExecutor", [], { signer: deployer });
+    await account.testSetup([owner1.address, owner2.address], 1, socialRecoveryModule.target, [await socialRecoveryModule.getAddress()]);
+    return { account, socialRecoveryModule, guardianStorage: socialRecoveryModule };
+  }
+
   async function _addGuardianWithThreshold(
     socialRecoveryModule: SocialRecoveryModule,
     account: TestExecutor,
@@ -271,6 +278,55 @@ describe("GuardianStorage", async () => {
       const data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [2]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "ChangedThreshold");
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(2);
+    });
+  });
+  describe("Fallback Handler Forwarding", async () => {
+    it("does not let a caller add itself as a guardian through the fallback handler", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
+      const data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [notGuardian.address, 1]);
+      await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
+      expect(await socialRecoveryModule.isGuardian(account.target, notGuardian.address)).to.eq(false);
+      expect(await socialRecoveryModule.guardiansCount(account.target)).to.eq(0);
+      expect(await socialRecoveryModule.threshold(account.target)).to.eq(0);
+    });
+    it("does not let a caller revoke a guardian through the fallback handler", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
+        SENTINEL_ADDRESS,
+        guardian1.address,
+        0,
+      ]);
+      await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
+      expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
+      expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
+    });
+    it("rejects wallet calls with non-canonical calldata", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      const forwarded = (data: string) => data + notGuardian.address.slice(2);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian3.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, forwarded(data))).to.be.revertedWith("GS: unexpected calldata length");
+      data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [guardian2.address, guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, forwarded(data))).to.be.revertedWith("GS: unexpected calldata length");
+      data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [2]);
+      await expect(account.exec(socialRecoveryModule.target, 0, forwarded(data))).to.be.revertedWith("GS: unexpected calldata length");
+      expect(await socialRecoveryModule.getGuardians(account.target)).to.deep.eq([guardian2.address, guardian1.address]);
+      expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
+    });
+    it("still lets the wallet manage guardians directly when the module is its fallback handler", async () => {
+      const { account, socialRecoveryModule, guardianStorage } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded");
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian2.address, 2]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianAdded");
+      data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "ChangedThreshold");
+      data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [guardian2.address, guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(guardianStorage, "GuardianRevoked");
+      expect(await socialRecoveryModule.getGuardians(account.target)).to.deep.eq([guardian2.address]);
+      expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
     });
   });
 });

@@ -34,6 +34,13 @@ describe("SocialRecoveryModule", async () => {
     return { account, socialRecoveryModule, guardianStorage };
   }
 
+  async function setupTestsWithModuleAsFallbackHandler() {
+    const socialRecoveryModule = await ethers.deployContract("SocialRecoveryModule", [3600], { signer: deployer });
+    const account = await hre.ethers.deployContract("TestExecutor", [], { signer: deployer });
+    await account.testSetup([owner1.address, owner2.address], 1, socialRecoveryModule.target, [await socialRecoveryModule.getAddress()]);
+    return { account, socialRecoveryModule };
+  }
+
   async function _addGuardianWithThreshold(
     socialRecoveryModule: SocialRecoveryModule,
     account: TestExecutor,
@@ -1099,6 +1106,40 @@ describe("SocialRecoveryModule", async () => {
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryFinalized");
       expect(await account.getOwners()).to.deep.eq([newOwner1.address]);
       expect(await account.getThreshold()).to.eq(1);
+    });
+  });
+  describe("Fallback Handler Forwarding", async () => {
+    it("does not let a caller cancel a recovery through the fallback handler", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.be.gt(0);
+    });
+    it("does not let a caller invalidate the nonce through the fallback handler", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
+      await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(0);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(1);
+    });
+    it("still lets the wallet cancel a recovery and invalidate its nonce directly when the module is its fallback handler", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryCanceled");
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
+      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "NonceInvalidated");
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
     });
   });
 });
