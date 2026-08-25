@@ -88,17 +88,18 @@ contract SocialRecoveryModule is GuardianStorage {
             );
     }
 
-    /// @dev Returns the bytes that are hashed to be signed by guardians.
-    function encodeRecoveryData(
+    /// @dev Returns the EIP-712 signable data of a recovery, i.e. 0x19 0x01 || domainSeparator || hashStruct(ExecuteRecovery).
+    /// Its keccak256 is the recovery hash signed by guardians, see `getRecoveryHash`.
+    function encodeRecoverySignableData(
         address _wallet,
         address[] calldata _newOwners,
         uint256 _newThreshold,
         uint256 _nonce
     ) public view returns (bytes memory) {
-        bytes32 recoveryHash = keccak256(
+        bytes32 structHash = keccak256(
             abi.encode(EXECUTE_RECOVERY_TYPEHASH, _wallet, keccak256(abi.encodePacked(_newOwners)), _newThreshold, _nonce)
         );
-        return abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator(), recoveryHash);
+        return abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator(), structHash);
     }
 
     /// @dev Generates the recovery hash that should be signed by the guardian to authorize a recovery
@@ -108,7 +109,7 @@ contract SocialRecoveryModule is GuardianStorage {
         uint256 _newThreshold,
         uint256 _nonce
     ) public view returns (bytes32) {
-        return keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
+        return keccak256(encodeRecoverySignableData(_wallet, _newOwners, _newThreshold, _nonce));
     }
 
     /// @dev checks if valid signature to the provided signer, and if this signer is indeed a guardian, revert otherwise

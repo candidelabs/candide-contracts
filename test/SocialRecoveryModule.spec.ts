@@ -718,7 +718,7 @@ describe("SocialRecoveryModule", async () => {
         "RecoveryExecuted",
       );
     });
-    it("encodeRecoveryData matches off-chain EIP-712 encoding", async () => {
+    it("encodeRecoverySignableData matches off-chain EIP-712 encoding", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       const newOwners = [newOwner1.address, newOwner2.address];
       const newThreshold = 2;
@@ -728,7 +728,7 @@ describe("SocialRecoveryModule", async () => {
         getEIP712Types(),
         await getEIP712Message(account, newOwners, newThreshold, nonce),
       );
-      expect(await socialRecoveryModule.encodeRecoveryData(account.target, newOwners, newThreshold, nonce)).to.eq(encodedTypedData);
+      expect(await socialRecoveryModule.encodeRecoverySignableData(account.target, newOwners, newThreshold, nonce)).to.eq(encodedTypedData);
       expect(await socialRecoveryModule.getRecoveryHash(account.target, newOwners, newThreshold, nonce)).to.eq(ethers.keccak256(encodedTypedData));
     });
   });
