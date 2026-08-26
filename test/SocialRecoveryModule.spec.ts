@@ -731,6 +731,35 @@ describe("SocialRecoveryModule", async () => {
       expect(await socialRecoveryModule.encodeRecoverySignableData(account.target, newOwners, newThreshold, nonce)).to.eq(encodedTypedData);
       expect(await socialRecoveryModule.getRecoveryHash(account.target, newOwners, newThreshold, nonce)).to.eq(ethers.keccak256(encodedTypedData));
     });
+    it("encodeRecoverySignableData returns the EIP-712 signing preimage", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const newOwners = [newOwner1.address, newOwner2.address];
+      const newThreshold = 2;
+      const nonce = 1n;
+      const domainSeparator = ethers.TypedDataEncoder.hashDomain(await getEIP712Domain(socialRecoveryModule));
+      const structHash = ethers.TypedDataEncoder.hashStruct(
+        "ExecuteRecovery",
+        getEIP712Types(),
+        await getEIP712Message(account, newOwners, newThreshold, nonce),
+      );
+      const signableData = await socialRecoveryModule.encodeRecoverySignableData(account.target, newOwners, newThreshold, nonce);
+      expect(await socialRecoveryModule.domainSeparator()).to.eq(domainSeparator);
+      expect(ethers.dataLength(signableData)).to.eq(66);
+      expect(ethers.dataSlice(signableData, 0, 2)).to.eq("0x1901");
+      expect(ethers.dataSlice(signableData, 2, 34)).to.eq(domainSeparator);
+      expect(ethers.dataSlice(signableData, 34, 66)).to.eq(structHash);
+    });
+    it("does not expose the former encodeRecoveryData function", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      expect(socialRecoveryModule.interface.hasFunction("encodeRecoveryData")).to.eq(false);
+      expect(socialRecoveryModule.interface.hasFunction("encodeRecoverySignableData")).to.eq(true);
+      const selector = ethers.id("encodeRecoveryData(address,address[],uint256,uint256)").slice(0, 10);
+      const args = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address[]", "uint256", "uint256"],
+        [account.target, [newOwner1.address], 1, 0],
+      );
+      await expect(deployer.call({ to: socialRecoveryModule.target, data: selector + args.slice(2) })).to.be.reverted;
+    });
   });
   describe("Execute Recovery", async () => {
     it("reverts if account has no guardians", async () => {
