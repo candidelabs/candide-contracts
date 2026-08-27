@@ -849,16 +849,12 @@ describe("SocialRecoveryModule", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
-      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      const data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).nonce).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(1);
-      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
-      await account.exec(socialRecoveryModule.target, 0, data);
-      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).nonce).to.eq(0);
-      expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
     });
-    it("reports the replaced request nonce when replacing a recovery after a nonce invalidation", async () => {
+    it("reports the replaced request nonce when replacing a recovery", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
@@ -866,21 +862,22 @@ describe("SocialRecoveryModule", async () => {
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1, guardian2]);
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
-      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
-      await account.exec(socialRecoveryModule.target, 0, data);
       await confirmRecovery(socialRecoveryModule, account, [newOwner2.address], 1, [guardian1, guardian2, guardian3]);
       data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner2.address], 1]);
       const tx = await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, 0);
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryExecuted").withArgs(account.target, anyValue, 1, 2, anyValue, 3);
-      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).nonce).to.eq(2);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryExecuted").withArgs(account.target, anyValue, 1, 1, anyValue, 3);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).nonce).to.eq(1);
     });
   });
   describe("Cancel Recovery", async () => {
-    it("reverts if there's no ongoing recovery", async () => {
+    it("invalidates the nonce when there is no ongoing recovery", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       const data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("SM: no ongoing recovery");
+      const tx = await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, 0);
+      await expect(tx).to.not.emit(socialRecoveryModule, "RecoveryCanceled");
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(1);
     });
     it("allows cancelling an ongoing recovery", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -893,19 +890,29 @@ describe("SocialRecoveryModule", async () => {
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
       expect(recoveryRequest.executeAfter).to.eq(0);
     });
-    it("reports the executed request nonce when cancelling after a nonce invalidation", async () => {
+    it("reports the executed request nonce when cancelling", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
-      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
-      await account.exec(socialRecoveryModule.target, 0, data);
-      expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(account.exec(socialRecoveryModule.target, 0, data))
         .to.emit(socialRecoveryModule, "RecoveryCanceled")
         .withArgs(account.target, 0);
+    });
+    it("invalidates pending confirmations", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, [newOwner1.address], 1, false]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await expect(socialRecoveryModule.executeRecovery.staticCall(account.target, [newOwner1.address], 1)).to.not.be.reverted;
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "NonceInvalidated");
+      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: confirmed signatures less than threshold",
+      );
     });
   });
   describe("Finalize Recovery", async () => {
@@ -1062,34 +1069,17 @@ describe("SocialRecoveryModule", async () => {
       expect(newOwners).to.deep.contain(newOwner3.address);
       expect(await account.getThreshold()).to.eq(2);
     });
-    it("reports the executed request nonce when finalizing after a nonce invalidation", async () => {
+    it("reports the executed request nonce when finalizing", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
-      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
-      await account.exec(socialRecoveryModule.target, 0, data);
       await time.increase(3601);
       data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
       await expect(account.exec(socialRecoveryModule.target, 0, data))
         .to.emit(socialRecoveryModule, "RecoveryFinalized")
         .withArgs(account.target, anyValue, 1, 0);
-    });
-  });
-  describe("Invalidate Nonce", async () => {
-    it("allows invalidating a nonce of a recovery", async () => {
-      const { account, socialRecoveryModule } = await loadFixture(setupTests);
-      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
-      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, [newOwner1.address], 1, false]);
-      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
-      await expect(socialRecoveryModule.executeRecovery.staticCall(account.target, [newOwner1.address], 1)).to.not.be.reverted;
-      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "NonceInvalidated");
-      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
-      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
-        "SM: confirmed signatures less than threshold",
-      );
     });
   });
   describe("Recovery Request Validation", async () => {
@@ -1148,26 +1138,26 @@ describe("SocialRecoveryModule", async () => {
       await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.be.gt(0);
     });
-    it("does not let a caller invalidate the nonce through the fallback handler", async () => {
+    it("does not let a caller invalidate pending confirmations through the fallback handler", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
-      const data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
+      const data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(0);
       expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(1);
     });
-    it("still lets the wallet cancel a recovery and invalidate its nonce directly when the module is its fallback handler", async () => {
+    it("still lets the wallet cancel a recovery directly when the module is its fallback handler", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryCanceled");
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "RecoveryCanceled")
+        .and.to.emit(socialRecoveryModule, "NonceInvalidated");
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
-      data = socialRecoveryModule.interface.encodeFunctionData("invalidateNonce");
-      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "NonceInvalidated");
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
     });
   });
