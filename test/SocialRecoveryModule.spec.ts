@@ -914,6 +914,56 @@ describe("SocialRecoveryModule", async () => {
         "SM: confirmed signatures less than threshold",
       );
     });
+    it("voids replacement confirmations collected while a request is pending", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian3.address, 2);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1, guardian2]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await confirmRecovery(socialRecoveryModule, account, [newOwner2.address], 1, [guardian1, guardian2, guardian3]);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner2.address], 1)).to.eq(3);
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      await account.exec(socialRecoveryModule.target, 0, data);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner2.address], 1)).to.eq(0);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian3.address, [newOwner2.address], 1)).to.eq(false);
+      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner2.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: confirmed signatures less than threshold",
+      );
+    });
+    it("emits RecoveryCanceled and NonceInvalidated with the corresponding nonces", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      const tx = await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, 0);
+      await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, 1);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
+    });
+    it("can be called repeatedly to keep invalidating confirmations", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      const data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "NonceInvalidated")
+        .withArgs(account.target, 0);
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "NonceInvalidated")
+        .withArgs(account.target, 1);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
+    });
+    it("does not expose the former invalidateNonce function", async () => {
+      const { socialRecoveryModule } = await loadFixture(setupTests);
+      expect(socialRecoveryModule.interface.hasFunction("invalidateNonce")).to.eq(false);
+      const selector = ethers.id("invalidateNonce()").slice(0, 10);
+      await expect(deployer.call({ to: socialRecoveryModule.target, data: selector })).to.be.reverted;
+    });
   });
   describe("Finalize Recovery", async () => {
     it("reverts if there's no ongoing recovery", async () => {
