@@ -361,12 +361,13 @@ contract SocialRecoveryModule is GuardianStorage {
     }
 
     /**
-     * @notice Retrieves specific guardian approval status a particular recovery request at current nonce.
+     * @notice Retrieves whether a current guardian has approved a particular recovery request at the current nonce.
+     * Approvals recorded by addresses that are no longer guardians are not reported, consistently with `getRecoveryApprovals`.
      * @param _wallet The target wallet.
      * @param _guardian The guardian.
      * @param _newOwners The new owners' addressess.
      * @param _newThreshold The new threshold for the safe.
-     * @return approvalCount The wallet's current recovery request
+     * @return true if `_guardian` is a guardian of `_wallet` and has approved this recovery request at the current nonce.
      */
     function hasGuardianApproved(
         address _wallet,
@@ -376,7 +377,7 @@ contract SocialRecoveryModule is GuardianStorage {
     ) public view returns (bool) {
         uint256 _nonce = nonce(_wallet);
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
-        return confirmedHashes[recoveryHash][_guardian];
+        return isGuardian(_wallet, _guardian) && confirmedHashes[recoveryHash][_guardian];
     }
 
     /**
