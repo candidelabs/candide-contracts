@@ -709,6 +709,32 @@ describe("SocialRecoveryModule", async () => {
       expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(true);
       expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian2.address, [newOwner1.address], 1)).to.eq(false);
     });
+    it("hasGuardianApproved ignores approvals of revoked guardians", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, [newOwner1.address], 1, false]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(true);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(1);
+      data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [guardian2.address, guardian1.address, 1]);
+      await account.exec(socialRecoveryModule.target, 0, data);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(false);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(0);
+    });
+    it("hasGuardianApproved agrees with getRecoveryApprovals when a revoked guardian is re-added", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, [newOwner1.address], 1, false]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [guardian2.address, guardian1.address, 1]);
+      await account.exec(socialRecoveryModule.target, 0, data);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(false);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(true);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(1);
+    });
     it("allows guardian recovery confirmation and executing", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
