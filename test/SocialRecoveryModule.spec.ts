@@ -824,7 +824,7 @@ describe("SocialRecoveryModule", async () => {
         "SM: new owner cannot be guardian",
       );
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
-      expect(recoveryRequest.executeAfter).to.eq(0);
+      expect(recoveryRequest.executableAt).to.eq(0);
     });
     it("can not replace existing recovery if new one doesn't have more approvals", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -851,7 +851,7 @@ describe("SocialRecoveryModule", async () => {
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
       expect(recoveryRequest.newOwners).to.deep.eq([newOwner1.address]);
       expect(recoveryRequest.newThreshold).to.eq(1);
-      expect(recoveryRequest.executeAfter).to.eq((await time.latest()) + 3600);
+      expect(recoveryRequest.executableAt).to.eq((await time.latest()) + 3600);
       expect(recoveryRequest.guardiansApprovalCount).to.eq(1);
     });
     it("allows replacing an existing recovery", async () => {
@@ -914,7 +914,7 @@ describe("SocialRecoveryModule", async () => {
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryCanceled");
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
-      expect(recoveryRequest.executeAfter).to.eq(0);
+      expect(recoveryRequest.executableAt).to.eq(0);
     });
     it("reports the executed request nonce when cancelling", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -952,7 +952,7 @@ describe("SocialRecoveryModule", async () => {
       expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner2.address], 1)).to.eq(3);
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await account.exec(socialRecoveryModule.target, 0, data);
-      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
       expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner2.address], 1)).to.eq(0);
       expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian3.address, [newOwner2.address], 1)).to.eq(false);
@@ -1105,7 +1105,7 @@ describe("SocialRecoveryModule", async () => {
       expect(newOwners).to.deep.contain(newOwner3.address);
       expect(await account.getThreshold()).to.eq(2);
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
-      expect(recoveryRequest.executeAfter).to.eq(0);
+      expect(recoveryRequest.executableAt).to.eq(0);
     });
     it("allows finalizing a recovery with single owner", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -1124,7 +1124,7 @@ describe("SocialRecoveryModule", async () => {
       expect(newOwners).to.deep.contain(newOwner1.address);
       expect(await account.getThreshold()).to.eq(1);
       const recoveryRequest = await socialRecoveryModule.getRecoveryRequest(account.target);
-      expect(recoveryRequest.executeAfter).to.eq(0);
+      expect(recoveryRequest.executableAt).to.eq(0);
     });
     it("allows finalizing a recovery if one of the new owners is an old one", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -1181,7 +1181,7 @@ describe("SocialRecoveryModule", async () => {
         "SM: new owner cannot be guardian",
       );
       expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [guardian1.address], 1)).to.eq(0);
-      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       // a corrected request can still be scheduled with the same approval count and finalized
       data = await _getMultiConfirmRecoveryData(
         socialRecoveryModule,
@@ -1212,7 +1212,7 @@ describe("SocialRecoveryModule", async () => {
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(notGuardian.sendTransaction({ to: account.target, data })).to.be.revertedWith("GS: unexpected calldata length");
-      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.be.gt(0);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.be.gt(0);
     });
     it("does not let a caller invalidate pending confirmations through the fallback handler", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTestsWithModuleAsFallbackHandler);
@@ -1233,7 +1233,7 @@ describe("SocialRecoveryModule", async () => {
       await expect(account.exec(socialRecoveryModule.target, 0, data))
         .to.emit(socialRecoveryModule, "RecoveryCanceled")
         .and.to.emit(socialRecoveryModule, "NonceInvalidated");
-      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executeAfter).to.eq(0);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(2);
     });
   });

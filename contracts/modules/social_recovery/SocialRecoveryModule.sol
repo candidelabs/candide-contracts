@@ -28,7 +28,7 @@ contract SocialRecoveryModule is GuardianStorage {
         uint256 guardiansApprovalCount;
         uint256 newThreshold;
         uint256 nonce;
-        uint64 executeAfter;
+        uint64 executableAt;
         address[] newOwners;
     }
 
@@ -44,7 +44,7 @@ contract SocialRecoveryModule is GuardianStorage {
         address[] indexed newOwners,
         uint256 newThreshold,
         uint256 nonce,
-        uint64 executeAfter,
+        uint64 executableAt,
         uint256 guardiansApprovalCount
     );
     event RecoveryFinalized(address indexed wallet, address[] indexed newOwners, uint256 newThreshold, uint256 nonce);
@@ -55,7 +55,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * @notice Throws if there is no ongoing recovery request.
      */
     modifier whenRecovery(address _wallet) {
-        require(recoveryRequests[_wallet].executeAfter > 0, "SM: no ongoing recovery");
+        require(recoveryRequests[_wallet].executableAt > 0, "SM: no ongoing recovery");
         _;
     }
 
@@ -229,17 +229,17 @@ contract SocialRecoveryModule is GuardianStorage {
         uint256 _nonce = nonce(_wallet);
         // If an ongoing recovery exists, replace only if more guardians than the previous guardians have approved this replacement
         RecoveryRequest storage request = recoveryRequests[_wallet];
-        if (request.executeAfter > 0) {
+        if (request.executableAt > 0) {
             require(_approvalCount > request.guardiansApprovalCount, "SM: not enough approvals for replacement");
             uint256 replacedNonce = request.nonce;
             delete recoveryRequests[_wallet];
             emit RecoveryCanceled(_wallet, replacedNonce);
         }
         // Start recovery execution
-        uint64 executeAfter = uint64(block.timestamp + recoveryPeriod);
-        recoveryRequests[_wallet] = RecoveryRequest(_approvalCount, _newThreshold, _nonce, executeAfter, _newOwners);
+        uint64 executableAt = uint64(block.timestamp + recoveryPeriod);
+        recoveryRequests[_wallet] = RecoveryRequest(_approvalCount, _newThreshold, _nonce, executableAt, _newOwners);
         walletsNonces[_wallet]++;
-        emit RecoveryExecuted(_wallet, _newOwners, _newThreshold, _nonce, executeAfter, _approvalCount);
+        emit RecoveryExecuted(_wallet, _newOwners, _newThreshold, _nonce, executableAt, _approvalCount);
     }
 
     /**
@@ -249,7 +249,7 @@ contract SocialRecoveryModule is GuardianStorage {
      */
     function finalizeRecovery(address _wallet) external whenRecovery(_wallet) {
         RecoveryRequest storage request = recoveryRequests[_wallet];
-        require(uint64(block.timestamp) >= request.executeAfter, "SM: recovery period still pending");
+        require(uint64(block.timestamp) >= request.executableAt, "SM: recovery period still pending");
         address[] memory newOwners = request.newOwners;
         uint256 newThreshold = request.newThreshold;
         uint256 requestNonce = request.nonce;
@@ -319,7 +319,7 @@ contract SocialRecoveryModule is GuardianStorage {
      */
     function cancelRecovery() external onlyCanonicalCalldata(0) {
         RecoveryRequest storage request = recoveryRequests[msg.sender];
-        if (request.executeAfter > 0) {
+        if (request.executableAt > 0) {
             uint256 requestNonce = request.nonce;
             delete recoveryRequests[msg.sender];
             emit RecoveryCanceled(msg.sender, requestNonce);
