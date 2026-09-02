@@ -854,6 +854,18 @@ describe("SocialRecoveryModule", async () => {
       expect(recoveryRequest.executableAt).to.eq((await time.latest()) + 3600);
       expect(recoveryRequest.guardiansApprovalCount).to.eq(1);
     });
+    it("reports executableAt as the scheduling time plus the recovery period", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      const scheduledAt = (await time.latest()) + 100;
+      await time.setNextBlockTimestamp(scheduledAt);
+      const data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data }))
+        .to.emit(socialRecoveryModule, "RecoveryExecuted")
+        .withArgs(account.target, anyValue, 1, 0, scheduledAt + 3600, 1);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(scheduledAt + 3600);
+    });
     it("allows replacing an existing recovery", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -1005,6 +1017,21 @@ describe("SocialRecoveryModule", async () => {
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
       await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("SM: recovery period still pending");
+    });
+    it("can be finalized at executableAt but not one second earlier", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      const executableAt = (await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt;
+      data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
+      await time.setNextBlockTimestamp(executableAt - 1n);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("SM: recovery period still pending");
+      await time.setNextBlockTimestamp(executableAt);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.emit(socialRecoveryModule, "RecoveryFinalized");
+      expect(await time.latest()).to.eq(executableAt);
+      expect(await account.getOwners()).to.deep.eq([newOwner1.address]);
     });
     it("reverts if plugin was not enabled", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
