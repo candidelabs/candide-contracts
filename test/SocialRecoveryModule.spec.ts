@@ -565,6 +565,35 @@ describe("SocialRecoveryModule", async () => {
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(2);
     });
+    it("emits one RecoveryConfirmed per signer", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
+      const newOwners = [newOwner1.address];
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 1, 0);
+      const data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        newOwners,
+        1,
+        [guardian1, guardian2],
+        false,
+        false,
+        false,
+        false,
+        guardian1,
+      );
+      const tx = await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await expect(tx)
+        .to.emit(socialRecoveryModule, "RecoveryConfirmed")
+        .withArgs(account.target, guardian1.address, recoveryHash, newOwners, 1, 0);
+      await expect(tx)
+        .to.emit(socialRecoveryModule, "RecoveryConfirmed")
+        .withArgs(account.target, guardian2.address, recoveryHash, newOwners, 1, 0);
+      const receipt = await tx.wait();
+      const names = (receipt?.logs ?? []).map((log) => socialRecoveryModule.interface.parseLog(log)?.name);
+      expect(names.filter((name) => name === "RecoveryConfirmed").length).to.eq(2);
+    });
     it("allows multiple guardians confirms of a recovery and auto-executing", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -734,6 +763,30 @@ describe("SocialRecoveryModule", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(true);
       expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(1);
+    });
+    it("emits RecoveryConfirmed with the proposal, recovery hash and nonce", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const newOwners = [newOwner1.address, newOwner2.address];
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 2, 0);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 2, false]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data }))
+        .to.emit(socialRecoveryModule, "RecoveryConfirmed")
+        .withArgs(account.target, guardian1.address, recoveryHash, newOwners, 2, 0);
+    });
+    it("emits RecoveryConfirmed bound to the current nonce", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      let data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      await account.exec(socialRecoveryModule.target, 0, data);
+      const newOwners = [newOwner1.address];
+      const staleHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 1, 0);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 1, 1);
+      expect(recoveryHash).to.not.eq(staleHash);
+      data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 1, false]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data }))
+        .to.emit(socialRecoveryModule, "RecoveryConfirmed")
+        .withArgs(account.target, guardian1.address, recoveryHash, newOwners, 1, 1);
     });
     it("allows guardian recovery confirmation and executing", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
