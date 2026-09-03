@@ -39,6 +39,14 @@ contract SocialRecoveryModule is GuardianStorage {
     // Recovery period
     uint256 internal immutable recoveryPeriod;
 
+    event RecoveryConfirmed(
+        address indexed wallet,
+        address indexed guardian,
+        bytes32 indexed recoveryHash,
+        address[] newOwners,
+        uint256 newThreshold,
+        uint256 nonce
+    );
     event RecoveryExecuted(
         address indexed wallet,
         address[] indexed newOwners,
@@ -155,6 +163,7 @@ contract SocialRecoveryModule is GuardianStorage {
         uint256 _nonce = nonce(_wallet);
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         confirmedHashes[recoveryHash][msg.sender] = true;
+        emit RecoveryConfirmed(_wallet, msg.sender, recoveryHash, _newOwners, _newThreshold, _nonce);
         //
         if (!_execute) return;
         uint256 guardiansThreshold = threshold(_wallet);
@@ -199,6 +208,7 @@ contract SocialRecoveryModule is GuardianStorage {
             }
             require(value.signer > lastSigner, "SM: duplicate signers/invalid ordering");
             confirmedHashes[recoveryHash][value.signer] = true;
+            emit RecoveryConfirmed(_wallet, value.signer, recoveryHash, _newOwners, _newThreshold, _nonce);
             lastSigner = value.signer;
         }
         //
