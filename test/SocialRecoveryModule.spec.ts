@@ -356,6 +356,22 @@ describe("SocialRecoveryModule", async () => {
         "SM: Invalid guardian signature",
       );
     });
+    it("reverts if the nonce is stale before any signature is checked", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const newOwners = [newOwner1.address];
+      const data = socialRecoveryModule.interface.encodeFunctionData("multiConfirmRecovery", [
+        account.target,
+        newOwners,
+        1,
+        0,
+        [{ signer: guardian1.address, signature: "0x" }],
+        false,
+      ]);
+      await account.exec(socialRecoveryModule.target, 0, socialRecoveryModule.interface.encodeFunctionData("cancelRecovery"));
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid nonce");
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, newOwners, 1)).to.eq(0);
+    });
     it("reverts if invalid signers ordering", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -807,6 +823,24 @@ describe("SocialRecoveryModule", async () => {
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data }))
         .to.emit(socialRecoveryModule, "RecoveryConfirmed")
         .withArgs(account.target, guardian1.address, recoveryHash, newOwners, 1, 1);
+    });
+    it("does not rebind a confirmation prepared for a nonce that was invalidated before inclusion", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const newOwners = [newOwner1.address];
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 1, 0, false]);
+      await account.exec(socialRecoveryModule.target, 0, socialRecoveryModule.interface.encodeFunctionData("cancelRecovery"));
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(1);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid nonce");
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, newOwners, 1)).to.eq(0);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, newOwners, 1)).to.eq(false);
+    });
+    it("reverts if the nonce is ahead of the current one", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, [newOwner1.address], 1, 1, false]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith("SM: invalid nonce");
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(0);
     });
     it("allows guardian recovery confirmation and executing", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
