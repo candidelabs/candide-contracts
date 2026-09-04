@@ -154,13 +154,21 @@ contract SocialRecoveryModule is GuardianStorage {
      * @param _wallet The target wallet.
      * @param _newOwners The new owners' addressess.
      * @param _newThreshold The new threshold for the safe.
+     * @param _nonce The wallet nonce the confirmation is meant for. It must be the current nonce of the wallet, so that a
+     * confirmation cannot be recorded for a later round if the nonce changes before the transaction is included.
      * @param _execute Whether to auto-start execution of recovery.
      */
-    function confirmRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, bool _execute) external {
+    function confirmRecovery(
+        address _wallet,
+        address[] calldata _newOwners,
+        uint256 _newThreshold,
+        uint256 _nonce,
+        bool _execute
+    ) external {
         require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
         _validateNewOwners(_wallet, _newOwners, _newThreshold);
+        require(_nonce == nonce(_wallet), "SM: invalid nonce");
         //
-        uint256 _nonce = nonce(_wallet);
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         confirmedHashes[recoveryHash][msg.sender] = true;
         emit RecoveryConfirmed(_wallet, msg.sender, recoveryHash, _newOwners, _newThreshold, _nonce);
@@ -179,6 +187,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * @param _wallet The target wallet.
      * @param _newOwners The new owners' addressess.
      * @param _newThreshold The new threshold for the safe.
+     * @param _nonce The wallet nonce the confirmations are meant for. It must be the current nonce of the wallet.
      * @param _signatures The guardian signatures, sorted by ascending signer address. Each entry is either an ECDSA
      * signature, an EIP-1271 contract signature (which may be empty, e.g. for a hash pre-approved by a Safe guardian),
      * or an empty signature whose signer is the sender, which counts as a direct confirmation by the sender.
@@ -188,15 +197,16 @@ contract SocialRecoveryModule is GuardianStorage {
         address _wallet,
         address[] calldata _newOwners,
         uint256 _newThreshold,
+        uint256 _nonce,
         SignatureData[] memory _signatures,
         bool _execute
     ) external {
         _validateNewOwners(_wallet, _newOwners, _newThreshold);
+        require(_nonce == nonce(_wallet), "SM: invalid nonce");
         require(_signatures.length > 0, "SM: empty signatures");
         uint256 guardiansThreshold = threshold(_wallet);
         require(guardiansThreshold > 0, "SM: empty guardians");
         //
-        uint256 _nonce = nonce(_wallet);
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
         address lastSigner = address(0);
         for (uint256 i = 0; i < _signatures.length; i++) {
