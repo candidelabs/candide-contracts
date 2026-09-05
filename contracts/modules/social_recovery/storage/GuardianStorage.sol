@@ -70,6 +70,7 @@ contract GuardianStorage is IGuardianStorage {
         if (entry.threshold != _threshold){
             _changeThreshold(msg.sender, _threshold);
         }
+        _afterGuardianConfigChange(msg.sender);
     }
 
     /**
@@ -93,6 +94,7 @@ contract GuardianStorage is IGuardianStorage {
         if (entry.threshold != _threshold){
             _changeThreshold(msg.sender, _threshold);
         }
+        _afterGuardianConfigChange(msg.sender);
     }
 
     /**
@@ -101,6 +103,7 @@ contract GuardianStorage is IGuardianStorage {
      */
     function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(1) {
         _changeThreshold(msg.sender, _threshold);
+        _afterGuardianConfigChange(msg.sender);
     }
 
     function _changeThreshold(address _wallet, uint256 _threshold) internal {
@@ -113,6 +116,13 @@ contract GuardianStorage is IGuardianStorage {
         entry.threshold = _threshold;
         emit ChangedThreshold(_wallet, _threshold);
     }
+
+    /**
+     * @dev Hook called after every successful guardian configuration change of a wallet, i.e. after a guardian is added or
+     * revoked or the threshold is changed. Meant to be overridden to react to the new configuration.
+     * @param _wallet The wallet whose guardian configuration changed.
+     */
+    function _afterGuardianConfigChange(address _wallet) internal virtual {}
 
     /**
      * @dev Checks if an account is a guardian for a wallet.

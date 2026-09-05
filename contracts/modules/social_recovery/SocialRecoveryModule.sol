@@ -335,17 +335,30 @@ contract SocialRecoveryModule is GuardianStorage {
     /**
      * @notice Lets the wallet stop all of its ongoing recovery activity: the ongoing recovery request, if any, is cancelled
      * and the wallet nonce is invalidated, so that guardian confirmations collected for the current nonce become unusable.
-     * @dev Can also be called without an ongoing request, e.g. to discard pending confirmations when rotating guardians.
+     * @dev Can also be called without an ongoing request, e.g. to discard pending confirmations. Any guardian configuration
+     * change of the wallet has the same effect, see `_afterGuardianConfigChange`.
      */
     function cancelRecovery() external onlyCanonicalCalldata(0) {
-        RecoveryRequest storage request = recoveryRequests[msg.sender];
+        _cancelRecovery(msg.sender);
+    }
+
+    function _cancelRecovery(address _wallet) internal {
+        RecoveryRequest storage request = recoveryRequests[_wallet];
         if (request.executableAt > 0) {
             uint256 requestNonce = request.nonce;
-            delete recoveryRequests[msg.sender];
-            emit RecoveryCanceled(msg.sender, requestNonce);
+            delete recoveryRequests[_wallet];
+            emit RecoveryCanceled(_wallet, requestNonce);
         }
-        uint256 invalidatedNonce = walletsNonces[msg.sender]++;
-        emit NonceInvalidated(msg.sender, invalidatedNonce);
+        uint256 invalidatedNonce = walletsNonces[_wallet]++;
+        emit NonceInvalidated(_wallet, invalidatedNonce);
+    }
+
+    /**
+     * @dev Every guardian configuration change starts a new recovery authorization epoch: a recovery scheduled and the
+     * confirmations collected under the previous guardian set or threshold are no longer valid.
+     */
+    function _afterGuardianConfigChange(address _wallet) internal override {
+        _cancelRecovery(_wallet);
     }
 
     /**

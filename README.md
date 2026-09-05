@@ -34,7 +34,7 @@ Owners of the account decide the threshold for the number of guardians needed fo
 
 Owners are encouraged to ask their guardians to provide fresh addresses. This makes them private and eliminates the possibility of malicious guardians cooperating against an owner. By design, a guardian does not need to necessarily store value in their account to maintain their duties, even during a recovery process.
 
-Once the recovery is initiated, the owners have until the `delayPeriod` to cancel the recovery, if the initiation was done with malicious intent. Once the `delayPeriod` is over, anyone can finalize the recovery to update the ownership of that particular Safe Wallet.
+Once the recovery is initiated, the owners have until the `delayPeriod` to cancel the recovery, if the initiation was done with malicious intent. Once the `delayPeriod` is over, anyone can finalize the recovery to update the ownership of that particular Safe Wallet. Any change to the guardian configuration (adding or revoking a guardian, or changing the guardian threshold) also cancels an ongoing recovery and invalidates the confirmations collected so far.
 
 Account Recovery interfaces can be built with or without a backend service:
 
