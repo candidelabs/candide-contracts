@@ -329,4 +329,26 @@ describe("GuardianStorage", async () => {
       expect(await socialRecoveryModule.threshold(account.target)).to.eq(1);
     });
   });
+  describe("Recovery Authorization Epoch", async () => {
+    it("starts a new recovery authorization epoch on every guardian configuration change", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      let data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "NonceInvalidated")
+        .withArgs(account.target, 0);
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian2.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "NonceInvalidated")
+        .withArgs(account.target, 1);
+      data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [2]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "NonceInvalidated")
+        .withArgs(account.target, 2);
+      data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [guardian2.address, guardian1.address, 1]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data))
+        .to.emit(socialRecoveryModule, "NonceInvalidated")
+        .withArgs(account.target, 3);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(4);
+    });
+  });
 });

@@ -11,12 +11,13 @@ describe("SocialRecoveryModule", async () => {
   let deployer: SignerWithAddress, owner1: SignerWithAddress, owner2: SignerWithAddress;
   let newOwner1: SignerWithAddress, newOwner2: SignerWithAddress, newOwner3: SignerWithAddress;
   let guardian1: SignerWithAddress, guardian2: SignerWithAddress, guardian3: SignerWithAddress, notGuardian: SignerWithAddress;
+  let guardian4: SignerWithAddress, guardian5: SignerWithAddress;
 
   const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
   const SENTINEL_ADDRESS = "0x0000000000000000000000000000000000000001";
 
   before(async () => {
-    [deployer, owner1, owner2, newOwner1, newOwner2, newOwner3, guardian1, guardian2, guardian3, notGuardian] =
+    [deployer, owner1, owner2, newOwner1, newOwner2, newOwner3, guardian1, guardian2, guardian3, notGuardian, guardian4, guardian5] =
       await hre.ethers.getSigners();
   });
 
@@ -1424,6 +1425,105 @@ describe("SocialRecoveryModule", async () => {
         .and.to.emit(socialRecoveryModule, "NonceInvalidated");
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
+    });
+  });
+  describe("Guardian Configuration Changes", async () => {
+    it("cancels a scheduled recovery when the guardian threshold is raised", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian3.address, 2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian4.address, 2);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian5.address, 2);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1, guardian2]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [3]);
+      const tx = await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(tx).to.emit(socialRecoveryModule, "ChangedThreshold").withArgs(account.target, 3);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
+      await time.increase(3601);
+      data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
+      await expect(account.exec(socialRecoveryModule.target, 0, data)).to.be.revertedWith("SM: no ongoing recovery");
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1, guardian2]);
+      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: confirmed signatures less than threshold",
+      );
+    });
+    it("cancels a scheduled recovery when a guardian is added", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian2.address, 1]);
+      const tx = await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(tx).to.emit(socialRecoveryModule, "GuardianAdded").withArgs(account.target, guardian2.address);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
+    });
+    it("cancels a scheduled recovery when a guardian is revoked", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [SENTINEL_ADDRESS, guardian2.address, 1]);
+      const tx = await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(tx).to.emit(socialRecoveryModule, "GuardianRevoked").withArgs(account.target, guardian2.address);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
+      expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
+      expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
+    });
+    it("invalidates pending confirmations on a configuration change without an ongoing recovery", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(1);
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      let data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [1]);
+      const tx = await account.exec(socialRecoveryModule.target, 0, data);
+      await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
+      await expect(tx).to.not.emit(socialRecoveryModule, "RecoveryCanceled");
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(0);
+      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: confirmed signatures less than threshold",
+      );
+    });
+    it("does not let a revoked and re-added guardian keep its confirmation", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 1);
+      await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [
+        guardian2.address,
+        guardian1.address,
+        1,
+      ]);
+      await account.exec(socialRecoveryModule.target, 0, data);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      expect(await socialRecoveryModule.isGuardian(account.target, guardian1.address)).to.eq(true);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, [newOwner1.address], 1)).to.eq(0);
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, [newOwner1.address], 1)).to.eq(false);
+      data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
+        "SM: confirmed signatures less than threshold",
+      );
     });
   });
 });
