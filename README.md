@@ -36,6 +36,8 @@ Owners are encouraged to ask their guardians to provide fresh addresses. This ma
 
 Once the recovery is initiated, the owners have until the `delayPeriod` to cancel the recovery, if the initiation was done with malicious intent. Once the `delayPeriod` is over, anyone can finalize the recovery to update the ownership of that particular Safe Wallet. Any change to the guardian configuration (adding or revoking a guardian, or changing the guardian threshold) also cancels an ongoing recovery and invalidates the confirmations collected so far.
 
+The module works with all Safe versions. On Safe 1.5 or later, it assumes that the module guard of the Safe, if any, is not malicious: the owner migration performed by `finalizeRecovery` runs as several module transactions, which a module guard observes while the Safe temporarily has a threshold of 1.
+
 Account Recovery interfaces can be built with or without a backend service:
 
 - An interface without a backend service can simply let each guardian submit their signatures separately. Once the threshold is met, anyone can call execute recovery to start the recovery period.
