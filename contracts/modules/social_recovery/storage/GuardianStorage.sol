@@ -49,8 +49,9 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
-     * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
+     * @dev Lets an authorized module add a guardian to a wallet and change the threshold.
      * @param _guardian The guardian to add.
+     * @param _threshold The new threshold.
      */
     function addGuardianWithThreshold(address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled onlyCanonicalCalldata(2) {
         require(_threshold > 0, "GS: threshold cannot be 0");
@@ -74,9 +75,10 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
-     * @dev Lets an authorised module revoke a guardian from a wallet and change the threshold.
-     * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list
+     * @dev Lets an authorized module revoke a guardian from a wallet and change the threshold.
+     * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list.
      * @param _guardian The guardian to revoke.
+     * @param _threshold The new threshold.
      */
     function revokeGuardianWithThreshold(
         address _prevGuardian,
@@ -98,7 +100,7 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
-     * @dev Allows to update the number of required confirmations by guardians.
+     * @dev Allows updating the number of required guardian confirmations.
      * @param _threshold New threshold.
      */
     function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled onlyCanonicalCalldata(1) {
@@ -153,7 +155,7 @@ contract GuardianStorage is IGuardianStorage {
     }
 
     /**
-     * @dev Gets the list of guaridans for a wallet.
+     * @dev Gets the list of guardians for a wallet.
      * @param _wallet The target wallet.
      * @return address[] list of guardians.
      */

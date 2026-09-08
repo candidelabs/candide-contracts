@@ -111,7 +111,7 @@ contract SocialRecoveryModule is GuardianStorage {
         return abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator(), structHash);
     }
 
-    /// @dev Generates the recovery hash that should be signed by the guardian to authorize a recovery
+    /// @dev Generates the recovery hash that should be signed by the guardians to authorize a recovery.
     function getRecoveryHash(
         address _wallet,
         address[] memory _newOwners,
@@ -121,7 +121,7 @@ contract SocialRecoveryModule is GuardianStorage {
         return keccak256(encodeRecoverySignableData(_wallet, _newOwners, _newThreshold, _nonce));
     }
 
-    /// @dev checks if valid signature to the provided signer, and if this signer is indeed a guardian, revert otherwise
+    /// @dev Checks that the signature is valid for the provided signer and that the signer is a guardian, reverts otherwise.
     function validateGuardianSignature(address _wallet, bytes32 _signHash, address _signer, bytes memory _signature) public view {
         require(isGuardian(_wallet, _signer), "SM: Signer not a guardian");
         require(SignatureChecker.isValidSignatureNow(_signer, _signHash, _signature), "SM: Invalid guardian signature");
@@ -149,11 +149,11 @@ contract SocialRecoveryModule is GuardianStorage {
     }
 
     /**
-     * @notice Lets single guardian confirm the execution of the recovery request.
-     * Can also trigger the start of the execution by passing true to '_execute' parameter.
-     * Once triggered the recovery is pending for the recovery period before it can be finalised.
+     * @notice Lets a single guardian confirm the execution of the recovery request.
+     * Can also trigger the start of the execution by passing true to the '_execute' parameter.
+     * Once triggered the recovery is pending for the recovery period before it can be finalized.
      * @param _wallet The target wallet.
-     * @param _newOwners The new owners' addressess.
+     * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
      * @param _nonce The wallet nonce the confirmation is meant for. It must be the current nonce of the wallet, so that a
      * confirmation cannot be recorded for a later round if the nonce changes before the transaction is included.
@@ -183,10 +183,10 @@ contract SocialRecoveryModule is GuardianStorage {
 
     /**
      * @notice Lets multiple guardians confirm the execution of the recovery request.
-     * Can also trigger the start of the execution by passing true to '_execute' parameter.
-     * Once triggered the recovery is pending for the recovery period before it can be finalised.
+     * Can also trigger the start of the execution by passing true to the '_execute' parameter.
+     * Once triggered the recovery is pending for the recovery period before it can be finalized.
      * @param _wallet The target wallet.
-     * @param _newOwners The new owners' addressess.
+     * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
      * @param _nonce The wallet nonce the confirmations are meant for. It must be the current nonce of the wallet.
      * @param _signatures The guardian signatures, sorted by ascending signer address. Each entry is either an ECDSA
@@ -231,9 +231,9 @@ contract SocialRecoveryModule is GuardianStorage {
 
     /**
      * @notice Lets the guardians start the execution of the recovery request.
-     * Once triggered the recovery is pending for the recovery period before it can be finalised.
+     * Once triggered the recovery is pending for the recovery period before it can be finalized.
      * @param _wallet The target wallet.
-     * @param _newOwners The new owners' addressess.
+     * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
      */
     function executeRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold) external {
@@ -334,7 +334,7 @@ contract SocialRecoveryModule is GuardianStorage {
     }
 
     /**
-     * @notice Lets the wallet stop all of its ongoing recovery activity: the ongoing recovery request, if any, is cancelled
+     * @notice Lets the wallet stop all of its ongoing recovery activity: the ongoing recovery request, if any, is canceled
      * and the wallet nonce is invalidated, so that guardian confirmations collected for the current nonce become unusable.
      * @dev Can also be called without an ongoing request, e.g. to discard pending confirmations. Any guardian configuration
      * change of the wallet has the same effect, see `_afterGuardianConfigChange`.
@@ -370,18 +370,18 @@ contract SocialRecoveryModule is GuardianStorage {
     /**
      * @notice Retrieves the wallet's current ongoing recovery request.
      * @param _wallet The target wallet.
-     * @return request The wallet's current recovery request
+     * @return request The wallet's current recovery request.
      */
     function getRecoveryRequest(address _wallet) public view returns (RecoveryRequest memory request) {
         return recoveryRequests[_wallet];
     }
 
     /**
-     * @notice Retrieves the guardian approval count for this particular recovery request at current nonce.
+     * @notice Retrieves the guardian approval count for a particular recovery request at the current nonce.
      * @param _wallet The target wallet.
-     * @param _newOwners The new owners' addressess.
+     * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
-     * @return approvalCount The wallet's current recovery request
+     * @return approvalCount The number of current guardians that have approved this recovery request.
      */
     function getRecoveryApprovals(
         address _wallet,
@@ -404,7 +404,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * Approvals recorded by addresses that are no longer guardians are not reported, consistently with `getRecoveryApprovals`.
      * @param _wallet The target wallet.
      * @param _guardian The guardian.
-     * @param _newOwners The new owners' addressess.
+     * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
      * @return true if `_guardian` is a guardian of `_wallet` and has approved this recovery request at the current nonce.
      */
@@ -422,7 +422,7 @@ contract SocialRecoveryModule is GuardianStorage {
     /**
      * @notice Get the module nonce for a wallet.
      * @param _wallet The target wallet.
-     * @return _nonce the nonce for this wallet.
+     * @return _nonce The nonce of this wallet.
      */
     function nonce(address _wallet) public view returns (uint256 _nonce) {
         return walletsNonces[_wallet];

@@ -3,20 +3,22 @@ pragma solidity >=0.8.12 <0.9.0;
 
 interface IGuardianStorage {
     /**
-     * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
+     * @dev Lets an authorized module add a guardian to a wallet and change the threshold.
      * @param _guardian The guardian to add.
+     * @param _threshold The new threshold.
      */
     function addGuardianWithThreshold(address _guardian, uint256 _threshold) external;
 
     /**
-     * @dev Lets an authorised module revoke a guardian from a wallet and change the threshold.
-     * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list
+     * @dev Lets an authorized module revoke a guardian from a wallet and change the threshold.
+     * @param _prevGuardian Guardian that pointed to the guardian to be removed in the linked list.
      * @param _guardian The guardian to revoke.
+     * @param _threshold The new threshold.
      */
     function revokeGuardianWithThreshold(address _prevGuardian, address _guardian, uint256 _threshold) external;
 
     /**
-     * @dev Allows to update the number of required confirmations by guardians.
+     * @dev Allows updating the number of required guardian confirmations.
      * @param _threshold New threshold.
      */
     function changeThreshold(uint256 _threshold) external;
