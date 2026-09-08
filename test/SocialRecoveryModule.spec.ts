@@ -3,6 +3,7 @@ import hre, { ethers } from "hardhat";
 import { expect } from "chai";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { Log } from "ethers";
 import { SignMessageLib, SocialRecoveryModule, TestExecutor } from "../typechain-types";
 import { BigNumber } from "@ethersproject/bignumber";
 import { getEIP712Domain, getEIP712Message, getEIP712Types } from "./utils/eip712_helper";
@@ -138,6 +139,12 @@ describe("SocialRecoveryModule", async () => {
     const message = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32"], [hash]);
     const data = signMessageLib.interface.encodeFunctionData("signMessage", [message]);
     await safeGuardian.connect(deployer).execTransactionFromModule(signMessageLib.target, 0, data, 1);
+  }
+
+  function _findLog(socialRecoveryModule: SocialRecoveryModule, logs: readonly Log[] | undefined, name: string): Log {
+    const log = (logs ?? []).find((l) => socialRecoveryModule.interface.parseLog(l)?.name === name);
+    if (!log) throw new Error(name + " log not found");
+    return log;
   }
 
   function _sortSignatures(signatures: SocialRecoveryModule.SignatureDataStruct[]) {
@@ -1534,6 +1541,69 @@ describe("SocialRecoveryModule", async () => {
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.be.revertedWith(
         "SM: confirmed signatures less than threshold",
       );
+    });
+  });
+  describe("Recovery Event Logs", async () => {
+    const abi = ethers.AbiCoder.defaultAbiCoder();
+
+    it("carries the new owners and the recovery hash in the RecoveryExecuted and RecoveryCanceled logs", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
+      const newOwners = [newOwner1.address, newOwner2.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 2, nonce);
+      const walletTopic = ethers.zeroPadValue(await account.getAddress(), 32).toLowerCase();
+      await confirmRecovery(socialRecoveryModule, account, newOwners, 2, [guardian1, guardian2]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, newOwners, 2]);
+      let receipt = await (await guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).wait();
+      const executed = _findLog(socialRecoveryModule, receipt?.logs, "RecoveryExecuted");
+      expect(executed.topics.length).to.eq(3);
+      expect(executed.topics[1].toLowerCase()).to.eq(walletTopic);
+      expect(executed.topics[2]).to.eq(recoveryHash);
+      const executedData = abi.decode(["address[]", "uint256", "uint256", "uint64", "uint256"], executed.data);
+      expect(Array.from(executedData[0])).to.deep.eq(newOwners);
+      expect(executedData[1]).to.eq(2);
+      expect(executedData[2]).to.eq(nonce);
+      expect(executedData[4]).to.eq(2);
+      data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
+      receipt = await (await account.exec(socialRecoveryModule.target, 0, data)).wait();
+      const canceled = _findLog(socialRecoveryModule, receipt?.logs, "RecoveryCanceled");
+      expect(canceled.topics.length).to.eq(3);
+      expect(canceled.topics[1].toLowerCase()).to.eq(walletTopic);
+      expect(canceled.topics[2]).to.eq(recoveryHash);
+      expect(abi.decode(["uint256"], canceled.data)[0]).to.eq(nonce);
+    });
+    it("carries the new owners and the recovery hash in the RecoveryFinalized log", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const newOwners = [newOwner1.address, newOwner2.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 2, nonce);
+      await confirmRecovery(socialRecoveryModule, account, newOwners, 2, [guardian1]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, newOwners, 2]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await time.increase(3601);
+      data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
+      const receipt = await (await account.exec(socialRecoveryModule.target, 0, data)).wait();
+      const finalized = _findLog(socialRecoveryModule, receipt?.logs, "RecoveryFinalized");
+      expect(finalized.topics.length).to.eq(3);
+      expect(finalized.topics[1].toLowerCase()).to.eq(ethers.zeroPadValue(await account.getAddress(), 32).toLowerCase());
+      expect(finalized.topics[2]).to.eq(recoveryHash);
+      const finalizedData = abi.decode(["address[]", "uint256", "uint256"], finalized.data);
+      expect(Array.from(finalizedData[0])).to.deep.eq(newOwners);
+      expect(finalizedData[1]).to.eq(2);
+      expect(finalizedData[2]).to.eq(nonce);
+    });
+    it("indexes the recovery hash but not the new owner set in the recovery events", async () => {
+      const { socialRecoveryModule } = await loadFixture(setupTests);
+      for (const name of ["RecoveryConfirmed", "RecoveryExecuted", "RecoveryFinalized"] as const) {
+        const inputs = socialRecoveryModule.interface.getEvent(name).inputs;
+        expect(inputs.find((input) => input.name === "newOwners")?.indexed, name).to.eq(false);
+        expect(inputs.find((input) => input.name === "recoveryHash")?.indexed, name).to.eq(true);
+      }
+      const canceled = socialRecoveryModule.interface.getEvent("RecoveryCanceled").inputs;
+      expect(canceled.find((input) => input.name === "recoveryHash")?.indexed).to.eq(true);
     });
   });
 });
