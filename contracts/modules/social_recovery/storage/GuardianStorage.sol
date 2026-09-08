@@ -22,7 +22,7 @@ contract GuardianStorage is IGuardianStorage {
         uint256 threshold;
     }
 
-    mapping (address => GuardianStorageEntry) internal entries;
+    mapping(address => GuardianStorageEntry) internal entries;
 
     event GuardianAdded(address indexed wallet, address indexed guardian);
     event GuardianRevoked(address indexed wallet, address indexed guardian);
@@ -52,13 +52,13 @@ contract GuardianStorage is IGuardianStorage {
      * @dev Lets an authorised module add a guardian to a wallet and change the threshold.
      * @param _guardian The guardian to add.
      */
-    function addGuardianWithThreshold(address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(2) {
+    function addGuardianWithThreshold(address _guardian, uint256 _threshold) external onlyWhenModuleIsEnabled onlyCanonicalCalldata(2) {
         require(_threshold > 0, "GS: threshold cannot be 0");
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS && _guardian != msg.sender, "GS: invalid guardian");
         require(!ISafe(payable(msg.sender)).isOwner(_guardian), "GS: guardian cannot be an owner");
         GuardianStorageEntry storage entry = entries[msg.sender];
         require(entry.guardians[_guardian] == address(0), "GS: duplicate guardian");
-        if (entry.count == 0){
+        if (entry.count == 0) {
             entry.guardians[SENTINEL_GUARDIANS] = _guardian;
             entry.guardians[_guardian] = SENTINEL_GUARDIANS;
         } else {
@@ -67,7 +67,7 @@ contract GuardianStorage is IGuardianStorage {
         }
         entry.count++;
         emit GuardianAdded(msg.sender, _guardian);
-        if (entry.threshold != _threshold){
+        if (entry.threshold != _threshold) {
             _changeThreshold(msg.sender, _threshold);
         }
         _afterGuardianConfigChange(msg.sender);
@@ -82,7 +82,7 @@ contract GuardianStorage is IGuardianStorage {
         address _prevGuardian,
         address _guardian,
         uint256 _threshold
-    ) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(3) {
+    ) external onlyWhenModuleIsEnabled onlyCanonicalCalldata(3) {
         GuardianStorageEntry storage entry = entries[msg.sender];
         require(_guardian != address(0) && _guardian != SENTINEL_GUARDIANS, "GS: invalid guardian");
         require(entry.guardians[_prevGuardian] == _guardian, "GS: invalid previous guardian");
@@ -91,7 +91,7 @@ contract GuardianStorage is IGuardianStorage {
         entry.guardians[_guardian] = address(0);
         entry.count--;
         emit GuardianRevoked(msg.sender, _guardian);
-        if (entry.threshold != _threshold){
+        if (entry.threshold != _threshold) {
             _changeThreshold(msg.sender, _threshold);
         }
         _afterGuardianConfigChange(msg.sender);
@@ -101,7 +101,7 @@ contract GuardianStorage is IGuardianStorage {
      * @dev Allows to update the number of required confirmations by guardians.
      * @param _threshold New threshold.
      */
-    function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled() onlyCanonicalCalldata(1) {
+    function changeThreshold(uint256 _threshold) external onlyWhenModuleIsEnabled onlyCanonicalCalldata(1) {
         _changeThreshold(msg.sender, _threshold);
         _afterGuardianConfigChange(msg.sender);
     }
@@ -110,7 +110,7 @@ contract GuardianStorage is IGuardianStorage {
         GuardianStorageEntry storage entry = entries[_wallet];
         // Validate that threshold is smaller than or equal to number of guardians.
         require(_threshold <= entry.count, "GS: threshold must be lower or equal to guardians count");
-        if (entry.count > 0){
+        if (entry.count > 0) {
             require(_threshold > 0, "GS: threshold cannot be 0");
         }
         entry.threshold = _threshold;
@@ -159,7 +159,7 @@ contract GuardianStorage is IGuardianStorage {
      */
     function getGuardians(address _wallet) public view returns (address[] memory) {
         GuardianStorageEntry storage entry = entries[_wallet];
-        if (entry.count == 0){
+        if (entry.count == 0) {
             return new address[](0);
         }
         address[] memory array = new address[](entry.count);
@@ -173,5 +173,4 @@ contract GuardianStorage is IGuardianStorage {
         }
         return array;
     }
-
 }

@@ -24,11 +24,7 @@ describe("SocialRecoveryModule", async () => {
   async function setupTests() {
     // await deployments.fixture();
     const guardianStorage = await ethers.deployContract("GuardianStorage", [], { signer: deployer });
-    const socialRecoveryModule = await ethers.deployContract(
-      "SocialRecoveryModule",
-      [3600],
-      { signer: deployer },
-    );
+    const socialRecoveryModule = await ethers.deployContract("SocialRecoveryModule", [3600], { signer: deployer });
     const account = await hre.ethers.deployContract("TestExecutor", [], { signer: deployer });
     await account.testSetup([owner1.address, owner2.address], 1, ADDRESS_ZERO, [await socialRecoveryModule.getAddress()]);
     //
@@ -899,7 +895,9 @@ describe("SocialRecoveryModule", async () => {
         await getEIP712Message(account, newOwners, newThreshold, nonce),
       );
       expect(await socialRecoveryModule.encodeRecoverySignableData(account.target, newOwners, newThreshold, nonce)).to.eq(encodedTypedData);
-      expect(await socialRecoveryModule.getRecoveryHash(account.target, newOwners, newThreshold, nonce)).to.eq(ethers.keccak256(encodedTypedData));
+      expect(await socialRecoveryModule.getRecoveryHash(account.target, newOwners, newThreshold, nonce)).to.eq(
+        ethers.keccak256(encodedTypedData),
+      );
     });
     it("encodeRecoverySignableData returns the EIP-712 signing preimage", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -1200,10 +1198,7 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       //
-      const removePluginData = account.interface.encodeFunctionData("disableModule", [
-        SENTINEL_ADDRESS,
-        socialRecoveryModule.target,
-      ]);
+      const removePluginData = account.interface.encodeFunctionData("disableModule", [SENTINEL_ADDRESS, socialRecoveryModule.target]);
       await account.exec(account.target, 0, removePluginData);
       //
       await time.increase(3601);
@@ -1249,7 +1244,11 @@ describe("SocialRecoveryModule", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address, newOwner2.address], 2, [guardian1]);
-      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address, newOwner2.address], 2]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [
+        account.target,
+        [newOwner1.address, newOwner2.address],
+        2,
+      ]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       await account.setMockModuleExecutionFunction(account.addOwnerWithThreshold.fragment.selector, true);
       //
@@ -1261,7 +1260,11 @@ describe("SocialRecoveryModule", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address, newOwner2.address], 2, [guardian1]);
-      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address, newOwner2.address], 2]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [
+        account.target,
+        [newOwner1.address, newOwner2.address],
+        2,
+      ]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       await account.setMockModuleExecutionFunction(account.changeThreshold.fragment.selector, true);
       //
@@ -1298,11 +1301,7 @@ describe("SocialRecoveryModule", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
-      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [
-        account.target,
-        [newOwner1.address],
-        1,
-      ]);
+      let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       await time.increase(3601);
       data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
