@@ -49,14 +49,15 @@ contract SocialRecoveryModule is GuardianStorage {
     );
     event RecoveryExecuted(
         address indexed wallet,
-        address[] indexed newOwners,
+        bytes32 indexed recoveryHash,
+        address[] newOwners,
         uint256 newThreshold,
         uint256 nonce,
         uint64 executableAt,
         uint256 guardiansApprovalCount
     );
-    event RecoveryFinalized(address indexed wallet, address[] indexed newOwners, uint256 newThreshold, uint256 nonce);
-    event RecoveryCanceled(address indexed wallet, uint256 nonce);
+    event RecoveryFinalized(address indexed wallet, bytes32 indexed recoveryHash, address[] newOwners, uint256 newThreshold, uint256 nonce);
+    event RecoveryCanceled(address indexed wallet, bytes32 indexed recoveryHash, uint256 nonce);
     event NonceInvalidated(address indexed wallet, uint256 nonce);
 
     /**
@@ -100,7 +101,7 @@ contract SocialRecoveryModule is GuardianStorage {
     /// Its keccak256 is the recovery hash signed by guardians, see `getRecoveryHash`.
     function encodeRecoverySignableData(
         address _wallet,
-        address[] calldata _newOwners,
+        address[] memory _newOwners,
         uint256 _newThreshold,
         uint256 _nonce
     ) public view returns (bytes memory) {
@@ -113,7 +114,7 @@ contract SocialRecoveryModule is GuardianStorage {
     /// @dev Generates the recovery hash that should be signed by the guardian to authorize a recovery
     function getRecoveryHash(
         address _wallet,
-        address[] calldata _newOwners,
+        address[] memory _newOwners,
         uint256 _newThreshold,
         uint256 _nonce
     ) public view returns (bytes32) {
@@ -251,15 +252,14 @@ contract SocialRecoveryModule is GuardianStorage {
         RecoveryRequest storage request = recoveryRequests[_wallet];
         if (request.executableAt > 0) {
             require(_approvalCount > request.guardiansApprovalCount, "SM: not enough approvals for replacement");
-            uint256 replacedNonce = request.nonce;
-            delete recoveryRequests[_wallet];
-            emit RecoveryCanceled(_wallet, replacedNonce);
+            _deleteRecoveryRequest(_wallet, request);
         }
         // Start recovery execution
         uint64 executableAt = uint64(block.timestamp + recoveryPeriod);
         recoveryRequests[_wallet] = RecoveryRequest(_approvalCount, _newThreshold, _nonce, executableAt, _newOwners);
         walletsNonces[_wallet]++;
-        emit RecoveryExecuted(_wallet, _newOwners, _newThreshold, _nonce, executableAt, _approvalCount);
+        bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
+        emit RecoveryExecuted(_wallet, recoveryHash, _newOwners, _newThreshold, _nonce, executableAt, _approvalCount);
     }
 
     /**
@@ -273,6 +273,7 @@ contract SocialRecoveryModule is GuardianStorage {
         address[] memory newOwners = request.newOwners;
         uint256 newThreshold = request.newThreshold;
         uint256 requestNonce = request.nonce;
+        bytes32 recoveryHash = getRecoveryHash(_wallet, newOwners, newThreshold, requestNonce);
         delete recoveryRequests[_wallet];
 
         ISafe safe = ISafe(payable(_wallet));
@@ -329,7 +330,7 @@ contract SocialRecoveryModule is GuardianStorage {
             }
         }
 
-        emit RecoveryFinalized(_wallet, newOwners, newThreshold, requestNonce);
+        emit RecoveryFinalized(_wallet, recoveryHash, newOwners, newThreshold, requestNonce);
     }
 
     /**
@@ -345,12 +346,17 @@ contract SocialRecoveryModule is GuardianStorage {
     function _cancelRecovery(address _wallet) internal {
         RecoveryRequest storage request = recoveryRequests[_wallet];
         if (request.executableAt > 0) {
-            uint256 requestNonce = request.nonce;
-            delete recoveryRequests[_wallet];
-            emit RecoveryCanceled(_wallet, requestNonce);
+            _deleteRecoveryRequest(_wallet, request);
         }
         uint256 invalidatedNonce = walletsNonces[_wallet]++;
         emit NonceInvalidated(_wallet, invalidatedNonce);
+    }
+
+    function _deleteRecoveryRequest(address _wallet, RecoveryRequest storage request) internal {
+        uint256 requestNonce = request.nonce;
+        bytes32 recoveryHash = getRecoveryHash(_wallet, request.newOwners, request.newThreshold, requestNonce);
+        delete recoveryRequests[_wallet];
+        emit RecoveryCanceled(_wallet, recoveryHash, requestNonce);
     }
 
     /**

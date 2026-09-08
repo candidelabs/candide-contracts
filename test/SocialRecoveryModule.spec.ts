@@ -1001,12 +1001,13 @@ describe("SocialRecoveryModule", async () => {
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
       await confirmRecovery(socialRecoveryModule, account, [newOwner1.address], 1, [guardian1]);
       const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, nonce);
       const scheduledAt = (await time.latest()) + 100;
       await time.setNextBlockTimestamp(scheduledAt);
       const data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data }))
         .to.emit(socialRecoveryModule, "RecoveryExecuted")
-        .withArgs(account.target, anyValue, 1, nonce, scheduledAt + 3600, 1);
+        .withArgs(account.target, recoveryHash, [newOwner1.address], 1, nonce, scheduledAt + 3600, 1);
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(scheduledAt + 3600);
     });
     it("allows replacing an existing recovery", async () => {
@@ -1045,13 +1046,17 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const replacedNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const replacedHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, replacedNonce);
       const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner2.address], 1, nonce);
       expect(nonce).to.eq(replacedNonce + 1n);
       await confirmRecovery(socialRecoveryModule, account, [newOwner2.address], 1, [guardian1, guardian2, guardian3]);
       data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner2.address], 1]);
       const tx = await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, replacedNonce);
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryExecuted").withArgs(account.target, anyValue, 1, nonce, anyValue, 3);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, replacedHash, replacedNonce);
+      await expect(tx)
+        .to.emit(socialRecoveryModule, "RecoveryExecuted")
+        .withArgs(account.target, recoveryHash, [newOwner2.address], 1, nonce, anyValue, 3);
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).nonce).to.eq(nonce);
     });
   });
@@ -1082,10 +1087,11 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const requestHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, requestNonce);
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       await expect(account.exec(socialRecoveryModule.target, 0, data))
         .to.emit(socialRecoveryModule, "RecoveryCanceled")
-        .withArgs(account.target, requestNonce);
+        .withArgs(account.target, requestHash, requestNonce);
     });
     it("invalidates pending confirmations", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
@@ -1135,11 +1141,12 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const requestHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, requestNonce);
       const nonce = await socialRecoveryModule.nonce(account.target);
       expect(nonce).to.eq(requestNonce + 1n);
       data = socialRecoveryModule.interface.encodeFunctionData("cancelRecovery");
       const tx = await account.exec(socialRecoveryModule.target, 0, data);
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestHash, requestNonce);
       await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
     });
@@ -1338,11 +1345,12 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const requestHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, requestNonce);
       await time.increase(3601);
       data = socialRecoveryModule.interface.encodeFunctionData("finalizeRecovery", [account.target]);
       await expect(account.exec(socialRecoveryModule.target, 0, data))
         .to.emit(socialRecoveryModule, "RecoveryFinalized")
-        .withArgs(account.target, anyValue, 1, requestNonce);
+        .withArgs(account.target, requestHash, [newOwner1.address], 1, requestNonce);
     });
   });
   describe("Recovery Request Validation", async () => {
@@ -1438,11 +1446,12 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const requestHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, requestNonce);
       const nonce = await socialRecoveryModule.nonce(account.target);
       data = socialRecoveryModule.interface.encodeFunctionData("changeThreshold", [3]);
       const tx = await account.exec(socialRecoveryModule.target, 0, data);
       await expect(tx).to.emit(socialRecoveryModule, "ChangedThreshold").withArgs(account.target, 3);
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestHash, requestNonce);
       await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
@@ -1462,11 +1471,12 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const requestHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, requestNonce);
       const nonce = await socialRecoveryModule.nonce(account.target);
       data = socialRecoveryModule.interface.encodeFunctionData("addGuardianWithThreshold", [guardian2.address, 1]);
       const tx = await account.exec(socialRecoveryModule.target, 0, data);
       await expect(tx).to.emit(socialRecoveryModule, "GuardianAdded").withArgs(account.target, guardian2.address);
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestHash, requestNonce);
       await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
@@ -1479,11 +1489,12 @@ describe("SocialRecoveryModule", async () => {
       let data = socialRecoveryModule.interface.encodeFunctionData("executeRecovery", [account.target, [newOwner1.address], 1]);
       await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
       const requestNonce = (await socialRecoveryModule.getRecoveryRequest(account.target)).nonce;
+      const requestHash = await socialRecoveryModule.getRecoveryHash(account.target, [newOwner1.address], 1, requestNonce);
       const nonce = await socialRecoveryModule.nonce(account.target);
       data = socialRecoveryModule.interface.encodeFunctionData("revokeGuardianWithThreshold", [SENTINEL_ADDRESS, guardian2.address, 1]);
       const tx = await account.exec(socialRecoveryModule.target, 0, data);
       await expect(tx).to.emit(socialRecoveryModule, "GuardianRevoked").withArgs(account.target, guardian2.address);
-      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestNonce);
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryCanceled").withArgs(account.target, requestHash, requestNonce);
       await expect(tx).to.emit(socialRecoveryModule, "NonceInvalidated").withArgs(account.target, nonce);
       expect((await socialRecoveryModule.getRecoveryRequest(account.target)).executableAt).to.eq(0);
       expect(await socialRecoveryModule.nonce(account.target)).to.eq(nonce + 1n);
