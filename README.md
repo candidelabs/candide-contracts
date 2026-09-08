@@ -59,7 +59,11 @@ We assume that the signer key belongs to its real owner. The probability of the 
 
 ## Audit
 
-- [For version 0.0.1 by Ackee Blockchain](./audit/ackee-blockchain-candide-social-recovery-report.pdf)
+- [Ackee Blockchain](./audit/audit-report-ackee.pdf) (version 0.0.1)
+- [Nethermind Security](./audit/audit-report-nethermind.pdf)
+- [Certora](./audit/audit-report-certora.pdf)
+
+See [audit/audit.md](./audit/audit.md) for the audited commits and notes on each report.
 
 # Development
 
