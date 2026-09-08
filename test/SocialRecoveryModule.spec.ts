@@ -1606,4 +1606,13 @@ describe("SocialRecoveryModule", async () => {
       expect(canceled.find((input) => input.name === "recoveryHash")?.indexed).to.eq(true);
     });
   });
+  describe("Module Version", async () => {
+    it("uses version 0.2.0 in the EIP-712 domain", async () => {
+      const { socialRecoveryModule } = await loadFixture(setupTests);
+      expect(await socialRecoveryModule.VERSION()).to.eq("0.2.0");
+      const domain = await getEIP712Domain(socialRecoveryModule);
+      expect(await socialRecoveryModule.domainSeparator()).to.eq(ethers.TypedDataEncoder.hashDomain(domain));
+      expect(await socialRecoveryModule.domainSeparator()).to.not.eq(ethers.TypedDataEncoder.hashDomain({ ...domain, version: "0.0.1" }));
+    });
+  });
 });

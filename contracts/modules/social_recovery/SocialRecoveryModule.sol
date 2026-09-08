@@ -9,7 +9,7 @@ import {ISafe, IOwnerManager, Enum} from "./../../interfaces/ISafe.sol";
 /// @author CANDIDE Labs
 contract SocialRecoveryModule is GuardianStorage {
     string public constant NAME = "Social Recovery Module";
-    string public constant VERSION = "0.0.1";
+    string public constant VERSION = "0.2.0";
 
     // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant DOMAIN_SEPARATOR_TYPEHASH = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
