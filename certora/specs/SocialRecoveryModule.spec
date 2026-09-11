@@ -50,6 +50,17 @@ hook Sstore recoveryRequests[KEY address account].newOwners.length uint256 value
     ghostNewOwnersLength[account] = value;
 }
 
+// v0.2.0 validates owners before accepting confirmations. Existing liveness
+// rules therefore require a valid proposal, including distinct non-guardian owners.
+function requireValidNewOwners(address wallet, address[] owners, uint256 ownerThreshold) {
+    require owners.length > 0 && ownerThreshold > 0 && ownerThreshold <= owners.length;
+    require forall uint256 i. i < owners.length =>
+        owners[i] != 0 && owners[i] != SENTINEL() && owners[i] != wallet &&
+        currentContract.entries[wallet].guardians[owners[i]] == 0;
+    require forall uint256 i. forall uint256 j.
+        i < j && j < owners.length => owners[i] != owners[j];
+}
+
 // A setup function that requires Safe contract to enable the Social Recovery Module.
 function requireSocialRecoveryModuleEnabled() {
     require(safeContract.isModuleEnabled(currentContract));
@@ -57,10 +68,10 @@ function requireSocialRecoveryModuleEnabled() {
 
 // Helper functions to be used in rules that require the recovery to be initiated.
 // Pending recovery means:
-// - a non-zero `executeAfter` timestamp in the `recoveryRequests` mapping (the smart contract checks it the same way)
+// - a non-zero `executableAt` timestamp in the `recoveryRequests` mapping (the smart contract checks it the same way)
 // - a non-zero nonce in `walletsNonces` mapping.
 function requireInitiatedRecovery(address wallet) {
-    require currentContract.recoveryRequests[safeContract].executeAfter > 0;
+    require currentContract.recoveryRequests[safeContract].executableAt > 0;
     require currentContract.walletsNonces[safeContract] > 0;
 }
 
@@ -134,6 +145,7 @@ rule addGuardianWorksAsExpected(env e, address guardian, uint256 threshold, addr
 
 // This integrity rule verifies that the guardian can always be added considering ideal conditions.
 rule guardianCanAlwaysBeAdded(env e, address guardian, uint256 threshold) {
+    require currentContract.nonce(safeContract) < max_uint256;
     requireSocialRecoveryModuleEnabled();
     requireGuardiansLinkedListIntegrity(guardian);
 
@@ -175,6 +187,7 @@ rule addGuardianRevertPossibilities(env e, address guardian, uint256 threshold) 
     bool isReverted = lastReverted;
 
     assert isReverted =>
+        currentContract.nonce(safeContract) == max_uint256 ||
         isGuardian ||
         e.msg.sender != safeContract ||
         e.msg.value != 0 ||
@@ -215,6 +228,7 @@ rule revokeGuardiansWorksAsExpected(env e, address guardian, address prevGuardia
 
 // This integrity rule verifies that the guardian can always be revoked considering ideal conditions.
 rule guardianCanAlwaysBeRevoked(env e, address guardian, address prevGuardian, uint256 threshold) {
+    require currentContract.nonce(safeContract) < max_uint256;
     requireSocialRecoveryModuleEnabled();
     requireGuardiansLinkedListIntegrity(guardian);
 
@@ -253,6 +267,7 @@ rule revokeGuardianRevertPossibilities(env e, address prevGuardian, address guar
     bool isReverted = lastReverted;
 
     assert isReverted =>
+        currentContract.nonce(safeContract) == max_uint256 ||
         !isGuardian ||
         e.msg.sender != safeContract ||
         e.msg.value != 0 ||
@@ -264,6 +279,7 @@ rule revokeGuardianRevertPossibilities(env e, address prevGuardian, address guar
 
 // This rule verifies that the guardian can always initiate recovery considering some ideal conditions.
 rule confirmRecoveryCanAlwaysBeInitiatedByGuardian(env e, address guardian, address[] newOwners, uint256 newThreshold, bool execute) {
+    requireValidNewOwners(safeContract, newOwners, newThreshold);
     uint256 index;
     // Index must be valid.
     require index < newOwners.length;
@@ -286,18 +302,18 @@ rule confirmRecoveryCanAlwaysBeInitiatedByGuardian(env e, address guardian, addr
 
     bytes32 recoveryHash = currentContract.getRecoveryHash(safeContract, newOwners, newThreshold, nonce);
     // This ensures that the recovery is not already initiated.
-    require currentContract.recoveryRequests[safeContract].executeAfter == 0;
+    require currentContract.recoveryRequests[safeContract].executableAt == 0;
 
     // This ensures that the required threshold is reached.
     require currentContract.getRecoveryApprovals(safeContract, newOwners, newThreshold) == currentContract.threshold(safeContract);
 
-    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, execute);
+    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, nonce, execute);
     bool isReverted = lastReverted;
 
     assert !isReverted &&
         currentContract.confirmedHashes[recoveryHash][e.msg.sender];
     assert execute =>
-        to_mathint(currentContract.recoveryRequests[safeContract].executeAfter) == e.block.timestamp + currentContract.recoveryPeriod &&
+        to_mathint(currentContract.recoveryRequests[safeContract].executableAt) == e.block.timestamp + currentContract.recoveryPeriod &&
         currentContract.recoveryRequests[safeContract].newThreshold == newThreshold &&
         currentContract.recoveryRequests[safeContract].newOwners.length == newOwners.length &&
         currentContract.recoveryRequests[safeContract].newOwners[index] == newOwners[index];
@@ -312,7 +328,7 @@ rule confirmRecoveryIsInitiatedOnlyByGuardian(env e, address[] newOwners, uint25
     uint256 nonce = currentContract.nonce(safeContract);
     bytes32 recoveryHash = currentContract.getRecoveryHash(safeContract, newOwners, newThreshold, nonce);
 
-    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, execute);
+    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, nonce, execute);
     bool success = !lastReverted;
 
     // Check if the recovery initiation started.
@@ -321,7 +337,7 @@ rule confirmRecoveryIsInitiatedOnlyByGuardian(env e, address[] newOwners, uint25
         currentContract.confirmedHashes[recoveryHash][e.msg.sender];
     // Check if the recovery is executed as well.
     assert success && execute =>
-        to_mathint(currentContract.recoveryRequests[safeContract].executeAfter) == e.block.timestamp + currentContract.recoveryPeriod &&
+        to_mathint(currentContract.recoveryRequests[safeContract].executableAt) == e.block.timestamp + currentContract.recoveryPeriod &&
         currentContract.recoveryRequests[safeContract].newThreshold == newThreshold;
 }
 
@@ -353,6 +369,7 @@ rule disabledRecoveryModuleResultsInFinalizationRevert(env e) {
 // This rule verifies that a guardian can only initiate recovery for the safe account it has been assigned to.
 // Here we only check initiation, and not execution of recovery.
 rule guardiansCanInitiateRecoveryForAssignedAccount(env e, address guardian, address[] newOwners, uint256 newThreshold) {
+    requireValidNewOwners(safeContract, newOwners, newThreshold);
     requireGuardiansLinkedListIntegrity(guardian);
 
     require e.msg.sender == guardian;
@@ -369,7 +386,7 @@ rule guardiansCanInitiateRecoveryForAssignedAccount(env e, address guardian, add
 
     // Here we are only focusing on the initiation and not the execution of the recovery, thus execute
     // parameter is passed as false.
-    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, false);
+    currentContract.confirmRecovery@withrevert(e, safeContract, newOwners, newThreshold, currentContract.nonce(safeContract), false);
     bool isReverted = lastReverted;
 
     // This checks the guardian cannot initiate recovery for account not assigned by safe account.
@@ -384,6 +401,7 @@ rule guardiansCanInitiateRecoveryForAssignedAccount(env e, address guardian, add
 
 // Recovery can be cancelled
 rule cancelRecovery(env e) {
+    require currentContract.nonce(safeContract) < max_uint256;
     require e.msg.sender == safeContract;
     require e.msg.value == 0;
 
@@ -412,7 +430,7 @@ rule cancelRecoveryDoesNotAffectOtherWallet(env e, address otherWallet) {
     assert safeContract != otherWallet =>
         otherRequestBefore.guardiansApprovalCount == otherRequestAfter.guardiansApprovalCount &&
         otherRequestBefore.newThreshold == otherRequestAfter.newThreshold &&
-        otherRequestBefore.executeAfter == otherRequestAfter.executeAfter &&
+        otherRequestBefore.executableAt == otherRequestAfter.executableAt &&
         otherRequestBefore.newOwners.length == otherRequestAfter.newOwners.length &&
         otherRequestBefore.newOwners[i] == otherRequestAfter.newOwners[i] &&
         otherWalletNonceBefore == currentContract.walletsNonces[otherWallet];
@@ -425,20 +443,20 @@ rule cancelRecoveryDoesNotAffectOtherWallet(env e, address otherWallet) {
 // - New owner should not be a guardian.
 // There is also a check on current safe owner length (this is for FV, in reality it should never be zero).
 rule finalizeRecovery(env e) {
-    uint64 executeAfter = currentContract.recoveryRequests[safeContract].executeAfter;
+    uint64 executableAt = currentContract.recoveryRequests[safeContract].executableAt;
 
     currentContract.finalizeRecovery@withrevert(e, safeContract);
 
     bool success = !lastReverted;
 
-    assert success => require_uint64(e.block.timestamp) >= executeAfter;
+    assert success => require_uint64(e.block.timestamp) >= executableAt;
     assert !success =>
         safeContract.getOwners().length == 0 ||
         !safeContract.isModuleEnabled(currentContract) ||
         currentContract.walletsNonces[safeContract] == 0 ||
-        executeAfter == 0 ||
+        executableAt == 0 ||
         e.msg.value != 0 ||
-        require_uint64(e.block.timestamp) < executeAfter ||
+        require_uint64(e.block.timestamp) < executableAt ||
         (exists uint256 i. currentContract.recoveryRequests[safeContract].newOwners[i] != SENTINEL() &&
         currentContract.entries[safeContract].guardians[currentContract.recoveryRequests[safeContract].newOwners[i]] != 0);
 }
@@ -455,7 +473,7 @@ rule invalidatingNonceInRecovery(env e, address guardian, address[] newOwners, u
     currentContract.executeRecovery@withrevert(e, safeContract, newOwners, newThreshold);
     bool success = !lastReverted;
 
-    currentContract.invalidateNonce@withrevert(e) at init;
+    currentContract.cancelRecovery@withrevert(e) at init;
     currentContract.executeRecovery@withrevert(e, safeContract, newOwners, newThreshold);
     bool isReverted = lastReverted;
     assert success => isReverted;
@@ -481,12 +499,12 @@ rule doesNotAffectOtherAccount(env e, method f, calldataarg args, address otherS
 
 // This rule verifies that Recovery can be finalized after the delay period.
 // This rule requires other conditions to be met as well:
-// - The recovery request should be initiated (i.e. `executeAfter != 0` and `walletsNonce[safeContract] > 0`).
+// - The recovery request should be initiated (i.e. `executableAt != 0` and `walletsNonce[safeContract] > 0`).
 // - No ether should be sent with the transaction.
 // - New owner should not be a guardian.
 // - Existing Safe owner count should be more than zero.
 rule finalizeRecoveryAlwaysPossible(env e) {
-    uint64 executeAfter = currentContract.recoveryRequests[safeContract].executeAfter;
+    uint64 executableAt = currentContract.recoveryRequests[safeContract].executableAt;
     require currentContract.walletsNonces[safeContract] > 0;
     require forall uint256 i. i < currentContract.recoveryRequests[safeContract].newOwners.length =>
             currentContract.recoveryRequests[safeContract].newOwners[i] != SENTINEL() &&
@@ -494,8 +512,8 @@ rule finalizeRecoveryAlwaysPossible(env e) {
 
     require safeContract.getOwners().length > 0;
     require e.msg.value == 0;
-    require require_uint64(e.block.timestamp) >= executeAfter;
-    require executeAfter > 0;
+    require require_uint64(e.block.timestamp) >= executableAt;
+    require executableAt > 0;
     require safeContract.isModuleEnabled(currentContract);
 
     currentContract.finalizeRecovery@withrevert(e, safeContract);
@@ -510,12 +528,15 @@ rule finalizeRecoveryAlwaysPossible(env e) {
 // - executeRecovery(...)
 // - finalizeRecovery(...)
 // - cancelRecovery(...)
+// - addGuardianWithThreshold(...)
+// - revokeGuardianWithThreshold(...)
+// - changeThreshold(...)
 // Each of these either updates or deletes the recovery request.
 rule recoveryRequestsChange(method f) {
     uint i;
     uint256 guardianApprovalCountBefore = currentContract.recoveryRequests[safeContract].guardiansApprovalCount;
     uint256 newThresholdBefore = currentContract.recoveryRequests[safeContract].newThreshold;
-    uint64 executeAfterBefore = currentContract.recoveryRequests[safeContract].executeAfter;
+    uint64 executableAtBefore = currentContract.recoveryRequests[safeContract].executableAt;
     address newOwnersBefore = currentContract.recoveryRequests[safeContract].newOwners[i];
 
     env e;
@@ -524,20 +545,23 @@ rule recoveryRequestsChange(method f) {
 
     uint256 guardianApprovalCountAfter = currentContract.recoveryRequests[safeContract].guardiansApprovalCount;
     uint256 newThresholdAfter = currentContract.recoveryRequests[safeContract].newThreshold;
-    uint64 executeAfterAfter = currentContract.recoveryRequests[safeContract].executeAfter;
+    uint64 executableAtAfter = currentContract.recoveryRequests[safeContract].executableAt;
     address newOwnersAfter = currentContract.recoveryRequests[safeContract].newOwners[i];
 
     assert (
         guardianApprovalCountBefore != guardianApprovalCountAfter ||
         newThresholdBefore != newThresholdAfter ||
-        executeAfterBefore != executeAfterAfter ||
+        executableAtBefore != executableAtAfter ||
         newOwnersBefore != newOwnersAfter
     ) =>
-        f.selector == sig:confirmRecovery(address,address[],uint256,bool).selector ||
-        f.selector == sig:multiConfirmRecovery(address,address[],uint256,SocialRecoveryModule.SignatureData[],bool).selector ||
+        f.selector == sig:confirmRecovery(address,address[],uint256,uint256,bool).selector ||
+        f.selector == sig:multiConfirmRecovery(address,address[],uint256,uint256,SocialRecoveryModule.SignatureData[],bool).selector ||
         f.selector == sig:executeRecovery(address,address[],uint256).selector ||
         f.selector == sig:finalizeRecovery(address).selector ||
-        f.selector == sig:cancelRecovery().selector;
+        f.selector == sig:cancelRecovery().selector ||
+        f.selector == sig:addGuardianWithThreshold(address,uint256).selector ||
+        f.selector == sig:revokeGuardianWithThreshold(address,address,uint256).selector ||
+        f.selector == sig:changeThreshold(uint256).selector;
 }
 
 // This rule verifies that is the confirmedHashes change, it must be one of the following functions:
@@ -553,15 +577,15 @@ rule confirmedHashesChange(method f, bytes32 hash, address guardian) {
     bool confirmedHashAfter = currentContract.confirmedHashes[hash][guardian];
 
     assert confirmedHashBefore != confirmedHashAfter =>
-        f.selector == sig:confirmRecovery(address,address[],uint256,bool).selector ||
-        f.selector == sig:multiConfirmRecovery(address,address[],uint256,SocialRecoveryModule.SignatureData[],bool).selector;
+        f.selector == sig:confirmRecovery(address,address[],uint256,uint256,bool).selector ||
+        f.selector == sig:multiConfirmRecovery(address,address[],uint256,uint256,SocialRecoveryModule.SignatureData[],bool).selector;
 }
 
 // This rule verifies that is the walletsNonces change, it must be one of the following functions:
 // - confirmRecovery(...)
 // - multiConfirmRecovery(...)
 // - executeRecovery(...)
-// - invalidateNonce(...)
+// - cancelRecovery() and guardian configuration changes
 rule walletsNoncesChange(method f) {
     uint256 walletsNoncesBefore = currentContract.walletsNonces[safeContract];
 
@@ -572,10 +596,13 @@ rule walletsNoncesChange(method f) {
     uint256 walletsNoncesAfter = currentContract.walletsNonces[safeContract];
 
     assert walletsNoncesBefore != walletsNoncesAfter =>
-        f.selector == sig:confirmRecovery(address,address[],uint256,bool).selector ||
-        f.selector == sig:multiConfirmRecovery(address,address[],uint256,SocialRecoveryModule.SignatureData[],bool).selector ||
+        f.selector == sig:confirmRecovery(address,address[],uint256,uint256,bool).selector ||
+        f.selector == sig:multiConfirmRecovery(address,address[],uint256,uint256,SocialRecoveryModule.SignatureData[],bool).selector ||
         f.selector == sig:executeRecovery(address,address[],uint256).selector ||
-        f.selector == sig:invalidateNonce().selector;
+        f.selector == sig:cancelRecovery().selector ||
+        f.selector == sig:addGuardianWithThreshold(address,uint256).selector ||
+        f.selector == sig:revokeGuardianWithThreshold(address,address,uint256).selector ||
+        f.selector == sig:changeThreshold(uint256).selector;
 }
 
 // This rule verifies that the recovery period never changes.
