@@ -6,7 +6,7 @@ methods {
     function isGuardian(address, address) external returns (bool) envfree;
 
     // Social Recovery Module Summaries
-    function getRecoveryHash(address, address[] calldata, uint256, uint256) internal returns (bytes32) => CONSTANT;
+    function getRecoveryHash(address, address[] memory, uint256, uint256) internal returns (bytes32) => CONSTANT;
     // The prover analysis fails in functions with heavy use of assembly code,
     // so we're summarizing the `isValidSignatureNow` function with a ghost function to avoid this issue and timeouts
     function SignatureChecker.isValidSignatureNow(address signer, bytes32 dataHash, bytes memory signature) internal returns (bool) => isValidSignatureNowSummary(signer, dataHash, signature);
@@ -46,7 +46,7 @@ rule multiConfirmRecoveryOnlyWithLegitimateSignatures(env e) {
     checkSignatures@withrevert(e, _wallet, recoveryHash, signatures);
     bool signatureCheckSuccess = !lastReverted;
 
-    multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, signatures, _execute);
+    multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, walletNonce, signatures, _execute);
     bool multiConfirmRecoverySuccess = !lastReverted;
 
     assert signatureCheckSuccess <=> multiConfirmRecoverySuccess, "Recovery confirmed with invalid signatures";
@@ -69,7 +69,7 @@ rule approvalsCountShouldEqualTheAmountOfSignatures(env e) {
         walletNonce
     );
 
-    multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, signatures, _execute);
+    multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, walletNonce, signatures, _execute);
 
     assert to_mathint(signatures.length) == recoveryConfirmationCount - recoveryConfirmationCountBefore, "More approvals counted than valid signatures";
 }
@@ -93,7 +93,7 @@ rule noShadowApprovals(env e) {
     // We need to correctly initialize pre-state to ensure that the `otherAddress` is not a signer and has not confirmed the recovery.
     require !currentContract.isGuardian(_wallet, otherAddress) && !currentContract.confirmedHashes[recoveryHash][otherAddress];
 
-    multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, signatures, _execute);
+    multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, walletNonce, signatures, _execute);
 
     assert forall uint256 i. i < signatures.length => currentContract.confirmedHashes[recoveryHash][signatures[i].signer], "Approvals were not correctly set";
     assert !currentContract.confirmedHashes[recoveryHash][otherAddress], "Other address should not be able to confirm recovery";
@@ -119,7 +119,7 @@ rule duplicateSignersRevert(env e) {
     require i1 != i2;
     require signatures[i1].signer == signatures[i2].signer;
 
-    multiConfirmRecovery@withrevert(e, _wallet, _newOwners, _newThreshold, signatures, _execute);
+    multiConfirmRecovery@withrevert(e, _wallet, _newOwners, _newThreshold, walletNonce, signatures, _execute);
     bool multiConfirmReverted = lastReverted;
 
     assert multiConfirmReverted, "Duplicate signers should revert";

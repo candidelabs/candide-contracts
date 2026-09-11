@@ -36,8 +36,8 @@ contract SocialRecoveryModuleHarness is SocialRecoveryModule {
      *         The function is copied from `multiConfirmRecovery` without the storage modifications.
      * @dev This function checks the validity and order of signatures for a wallet recovery hash.
      *      It ensures that all signatures are from the wallet's guardians and that they are in
-     *      ascending order to prevent duplicates. Null signatures must have the sender as the signer and the sender
-     *      must be a guardian.
+     *      ascending order to prevent duplicates. An empty signature from the sender is a direct guardian confirmation; other
+     *      empty signatures are checked through SignatureChecker (including EIP-1271).
      * @param _wallet The address of the wallet being recovered.
      * @param recoveryHash The hash of the recovery data which needs to be signed by the guardians.
      * @param _signatures An array of SignatureData structures containing the signer's address and their signature.
@@ -48,9 +48,8 @@ contract SocialRecoveryModuleHarness is SocialRecoveryModule {
         address lastSigner = address(0);
         for (uint256 i = 0; i < _signatures.length; i++) {
             SignatureData memory value = _signatures[i];
-            if (value.signature.length == 0) {
+            if (value.signer == msg.sender && value.signature.length == 0) {
                 require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
-                require(msg.sender == value.signer, "SM: null signature should have the signer as the sender");
             } else {
                 validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
             }
