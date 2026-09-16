@@ -53,6 +53,10 @@ rule multiConfirmRecoveryOnlyWithLegitimateSignatures(env e) {
 }
 
 // This rule checks that the number of approvals counted by the contract is equal to the number of valid signatures.
+// A signer that already confirmed the recovery hash is not written (or emitted) again, so the rule starts from
+// a state where none of the supplied signers has confirmed yet. The precondition is spelled out per index rather
+// than quantified, because the prover drops a quantified `require` over array elements as unused. Three entries
+// match `loop_iter`, and `optimistic_loop` already prunes longer arrays.
 rule approvalsCountShouldEqualTheAmountOfSignatures(env e) {
     mathint recoveryConfirmationCountBefore = recoveryConfirmationCount;
     address _wallet;
@@ -68,6 +72,9 @@ rule approvalsCountShouldEqualTheAmountOfSignatures(env e) {
         _newThreshold,
         walletNonce
     );
+    require signatures.length > 0 => !currentContract.confirmedHashes[recoveryHash][signatures[0].signer];
+    require signatures.length > 1 => !currentContract.confirmedHashes[recoveryHash][signatures[1].signer];
+    require signatures.length > 2 => !currentContract.confirmedHashes[recoveryHash][signatures[2].signer];
 
     multiConfirmRecovery(e, _wallet, _newOwners, _newThreshold, walletNonce, signatures, _execute);
 
