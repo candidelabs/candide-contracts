@@ -152,6 +152,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * @notice Lets a single guardian confirm the execution of the recovery request.
      * Can also trigger the start of the execution by passing true to the '_execute' parameter.
      * Once triggered the recovery is pending for the recovery period before it can be finalized.
+     * Confirming a recovery hash the guardian already confirmed has no effect and does not emit `RecoveryConfirmed` again.
      * @param _wallet The target wallet.
      * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
@@ -171,8 +172,10 @@ contract SocialRecoveryModule is GuardianStorage {
         require(_nonce == nonce(_wallet), "SM: invalid nonce");
         //
         bytes32 recoveryHash = getRecoveryHash(_wallet, _newOwners, _newThreshold, _nonce);
-        confirmedHashes[recoveryHash][msg.sender] = true;
-        emit RecoveryConfirmed(_wallet, msg.sender, recoveryHash, _newOwners, _newThreshold, _nonce);
+        if (!confirmedHashes[recoveryHash][msg.sender]) {
+            confirmedHashes[recoveryHash][msg.sender] = true;
+            emit RecoveryConfirmed(_wallet, msg.sender, recoveryHash, _newOwners, _newThreshold, _nonce);
+        }
         //
         if (!_execute) return;
         uint256 guardiansThreshold = threshold(_wallet);
@@ -185,6 +188,7 @@ contract SocialRecoveryModule is GuardianStorage {
      * @notice Lets multiple guardians confirm the execution of the recovery request.
      * Can also trigger the start of the execution by passing true to the '_execute' parameter.
      * Once triggered the recovery is pending for the recovery period before it can be finalized.
+     * Signers that already confirmed the recovery hash are still validated but do not emit `RecoveryConfirmed` again.
      * @param _wallet The target wallet.
      * @param _newOwners The new owners' addresses.
      * @param _newThreshold The new threshold for the safe.
@@ -218,8 +222,10 @@ contract SocialRecoveryModule is GuardianStorage {
                 validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
             }
             require(value.signer > lastSigner, "SM: duplicate signers/invalid ordering");
-            confirmedHashes[recoveryHash][value.signer] = true;
-            emit RecoveryConfirmed(_wallet, value.signer, recoveryHash, _newOwners, _newThreshold, _nonce);
+            if (!confirmedHashes[recoveryHash][value.signer]) {
+                confirmedHashes[recoveryHash][value.signer] = true;
+                emit RecoveryConfirmed(_wallet, value.signer, recoveryHash, _newOwners, _newThreshold, _nonce);
+            }
             lastSigner = value.signer;
         }
         //
