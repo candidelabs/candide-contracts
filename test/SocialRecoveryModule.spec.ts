@@ -626,6 +626,36 @@ describe("SocialRecoveryModule", async () => {
       const names = (receipt?.logs ?? []).map((log) => socialRecoveryModule.interface.parseLog(log)?.name);
       expect(names.filter((name) => name === "RecoveryConfirmed").length).to.eq(2);
     });
+    it("does not emit RecoveryConfirmed again for a signer that already confirmed", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian2.address, 2);
+      const newOwners = [newOwner1.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const recoveryHash = await socialRecoveryModule.getRecoveryHash(account.target, newOwners, 1, nonce);
+      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 1, nonce, false]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      data = await _getMultiConfirmRecoveryData(
+        socialRecoveryModule,
+        account,
+        newOwners,
+        1,
+        [guardian1, guardian2],
+        false,
+        false,
+        false,
+        false,
+        guardian1,
+      );
+      const tx = await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await expect(tx)
+        .to.emit(socialRecoveryModule, "RecoveryConfirmed")
+        .withArgs(account.target, guardian2.address, recoveryHash, newOwners, 1, nonce);
+      const receipt = await tx.wait();
+      const names = (receipt?.logs ?? []).map((log) => socialRecoveryModule.interface.parseLog(log)?.name);
+      expect(names.filter((name) => name === "RecoveryConfirmed").length).to.eq(1);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, newOwners, 1)).to.eq(2);
+    });
     it("allows multiple guardians confirms of a recovery and auto-executing", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
       await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
@@ -833,6 +863,34 @@ describe("SocialRecoveryModule", async () => {
       await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data }))
         .to.emit(socialRecoveryModule, "RecoveryConfirmed")
         .withArgs(account.target, guardian1.address, recoveryHash, newOwners, 2, nonce);
+    });
+    it("does not emit RecoveryConfirmed when the guardian already confirmed the same recovery", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const newOwners = [newOwner1.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      const data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 1, nonce, false]);
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.emit(socialRecoveryModule, "RecoveryConfirmed");
+      await expect(guardian1.sendTransaction({ to: socialRecoveryModule.target, data })).to.not.emit(
+        socialRecoveryModule,
+        "RecoveryConfirmed",
+      );
+      expect(await socialRecoveryModule.hasGuardianApproved(account.target, guardian1.address, newOwners, 1)).to.eq(true);
+      expect(await socialRecoveryModule.getRecoveryApprovals(account.target, newOwners, 1)).to.eq(1);
+    });
+    it("lets a guardian that already confirmed start execution without a second RecoveryConfirmed", async () => {
+      const { account, socialRecoveryModule } = await loadFixture(setupTests);
+      await _addGuardianWithThreshold(socialRecoveryModule, account, guardian1.address, 1);
+      const newOwners = [newOwner1.address];
+      const nonce = await socialRecoveryModule.nonce(account.target);
+      let data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 1, nonce, false]);
+      await guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      data = socialRecoveryModule.interface.encodeFunctionData("confirmRecovery", [account.target, newOwners, 1, nonce, true]);
+      const tx = guardian1.sendTransaction({ to: socialRecoveryModule.target, data });
+      await expect(tx).to.not.emit(socialRecoveryModule, "RecoveryConfirmed");
+      await expect(tx).to.emit(socialRecoveryModule, "RecoveryExecuted");
+      const request = await socialRecoveryModule.getRecoveryRequest(account.target);
+      expect(request.executableAt).to.be.gt(0);
     });
     it("emits RecoveryConfirmed bound to the current nonce", async () => {
       const { account, socialRecoveryModule } = await loadFixture(setupTests);
