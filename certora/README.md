@@ -53,6 +53,10 @@ module guards. The Hardhat suites check post-finalization owners and events at r
 - The existing suites use bounded loop exploration with `optimistic_loop`;
   the recovery/signature suites and the new validation suite use `loop_iter: 3`.
   Proof results are subject to those loop bounds, including nested owner checks.
+- `optimistic_hashing` uses the default 224-byte `hashing_length_bound`, which
+  bounds `keccak256(abi.encodePacked(newOwners))` to 7 owners. With
+  `loop_iter: 3`, the effective bound for owner lists (including
+  `recoveryHashBindsRequest`) is smaller; longer lists are outside the proofs.
 - The signature suite retains the existing constant internal recovery-hash
   abstraction and a deterministic signature-validity ghost. It checks the
   module's use of signature validation, not ECDSA or EIP-1271 cryptography itself.
