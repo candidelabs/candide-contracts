@@ -4,108 +4,195 @@
 
 ![atelier-meta-web](https://github.com/candidelabs/.github/assets/7014833/5090c8d1-31ad-4daf-9efd-adae4c350c35)
 
-# About
+## About
 
-Candide Wallet is a smart contract wallet for Ethereum Mainnet and EVM compatible rollups.<br/>
-This repo includes the smart contracts used by Candide Labs.
+Smart contracts from Candide Labs for Safe accounts and ERC-4337 account abstraction on EVM networks.
+The repository includes a social recovery module, a Safe-based wallet and proxy factory, an ERC-20 paymaster,
+and experimental BLS accounts and signature aggregators.
 
-# Features
+## Contracts
 
-- <a href="https://eips.ethereum.org/EIPS/eip-4337">EIP-4337: Account Abstraction via Entry Point Contract</a>
-- Account Recovery
-- Pay gas with ERC-20 using a Paymaster
+| Component                     | Source                                                                                   | Purpose                                                                                    |
+| ----------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Social Recovery Module v0.2.0 | [SocialRecoveryModule.sol](./contracts/modules/social_recovery/SocialRecoveryModule.sol) | Guardian approvals and delayed replacement of a Safe's owners and signing threshold.       |
+| Guardian storage              | [GuardianStorage.sol](./contracts/modules/social_recovery/storage/GuardianStorage.sol)   | Per-wallet guardian lists and recovery thresholds; inherited by the recovery module.       |
+| Candide Wallet                | [CandideWallet.sol](./contracts/candideWallet/CandideWallet.sol)                         | Extends Safe with EntryPoint validation and execution of user operations.                  |
+| Wallet proxies                | [proxies/](./contracts/candideWallet/proxies/)                                           | Wallet proxy and factory, including deterministic deployment methods.                      |
+| Candide Paymaster             | [CandidePaymaster.sol](./contracts/paymaster/CandidePaymaster.sol)                       | Owner-authorized sponsorship with ERC-20 gas payment, gas plus a fee, or free sponsorship. |
+| Experimental BLS contracts    | [experimental/bls/](./contracts/experimental/bls/)                                       | BLS accounts, signature aggregators, and public-key aggregation helpers.                   |
 
-# Account Recovery
+[contracts/test/](./contracts/test/) contains mocks, test helpers, and sample contracts.
+The dependency declarations use account-abstraction v0.6.0, Safe contracts `^1.4.1-build.0`, and OpenZeppelin contracts `^4.9.1`.
 
-_In this section, we highlight and explain the [SocialRecoveryModule.sol](./contracts/modules/social_recovery/SocialRecoveryModule.sol) contract._
+## Account recovery
 
-The Account Recovery module is designed to work for both a single-owner account and an n-m multi-sig account. In the case of the single-owner account, the signer key is typically stored on the user's device. More specifically, owners can add recovery addresses (also known as Guardians) to change the ownership of the account, in case their signer key is lost or compromised.
+The Social Recovery Module supports both single-owner and multisig Safe accounts. Guardians authorize a replacement
+owner set and Safe signing threshold when owners lose access to their keys. Guardians can be externally owned accounts
+or contracts that validate EIP-1271 signatures. They do not approve the Safe's normal transactions.
 
-Recovery methods are typical Ethereum accounts. They can be:
+### Setup and guardian management
 
-- Family & Friends' contacts
-- Hardware wallets
-- Institutions
-- Custodial services that offer cloud-based wallets
+Enable the deployed recovery module on the Safe, then call its guardian-management methods through Safe transactions.
+These methods use `msg.sender` as the wallet address and require the module to be enabled on that wallet.
+The Safe's normal authorization rules govern those transactions.
 
-Normal operations of the Account do not require the approval of added Guardians in the module.
+- `addGuardianWithThreshold(guardian, threshold)` adds a guardian and sets the recovery threshold.
+- `revokeGuardianWithThreshold(prevGuardian, guardian, threshold)` removes a guardian and sets the recovery threshold.
+  Guardians form a linked list: obtain their order with `getGuardians(wallet)` and use `address(0x1)` as the predecessor of the first guardian.
+- `changeThreshold(threshold)` changes the number of guardian approvals required.
 
-Owners of the account decide the threshold for the number of guardians needed for recovery, as well as the number of guardians. A typical single-owner account can have 3 guardians with a threshold of 2. This decreases the likelihood that a single guardian can overtake the account.
+A guardian cannot be the zero address, `address(0x1)`, the wallet itself, an existing guardian, or a current Safe owner when added.
+The recovery threshold must be between one and the number of guardians while guardians remain; it can be zero when none remain.
+The guardian threshold is separate from the Safe's owner signing threshold.
 
-Owners are encouraged to ask their guardians to provide fresh addresses. This makes them private and eliminates the possibility of malicious guardians cooperating against an owner. By design, a guardian does not need to necessarily store value in their account to maintain their duties, even during a recovery process.
+Every successful guardian configuration call cancels any scheduled recovery and advances the wallet's recovery nonce,
+invalidating pending confirmations and signatures. This also applies when `changeThreshold` sets the existing value.
+Guardian-management methods and `cancelRecovery()` require canonical ABI calldata lengths to reject calls forwarded by a Safe fallback handler.
 
-Once the recovery is initiated, the owners have until the `delayPeriod` to cancel the recovery, if the initiation was done with malicious intent. Once the `delayPeriod` is over, anyone can finalize the recovery to update the ownership of that particular Safe Wallet. Any change to the guardian configuration (adding or revoking a guardian, or changing the guardian threshold) also cancels an ongoing recovery and invalidates the confirmations collected so far.
+### Recovery flow
 
-The module works with all Safe versions. On Safe 1.5 or later, it assumes that the module guard of the Safe, if any, is not malicious: the owner migration performed by `finalizeRecovery` runs as several module transactions, which a module guard observes while the Safe temporarily has a threshold of 1.
+1. **Choose the new owners and threshold.** The owner list must be nonempty and contain unique addresses. New owners cannot
+   be the zero address, `address(0x1)`, the wallet itself, or current guardians. The new Safe threshold must be between one
+   and the number of new owners.
+2. **Collect guardian approvals for `nonce(wallet)`.** A guardian can call
+   `confirmRecovery(wallet, newOwners, newThreshold, nonce, execute)` directly. Anyone can relay signed approvals with
+   `multiConfirmRecovery(wallet, newOwners, newThreshold, nonce, signatures, execute)`.
+   Both methods require the supplied nonce to match the wallet's current recovery nonce.
+3. **Schedule recovery.** Once enough guardians have approved, anyone can call
+   `executeRecovery(wallet, newOwners, newThreshold)`. Either confirmation method can also schedule recovery by setting
+   `execute` to `true`, provided the resulting approval count meets the guardian threshold.
+   Scheduling advances the nonce and stores the request's nonce, approval count, proposed owners, threshold, and `executableAt` timestamp.
+4. **Wait for the recovery period.** The immutable `recoveryPeriod` is set in seconds when the module is deployed.
+   The Safe can call `cancelRecovery()` any time before finalization. A replacement recovery requires approvals at the new
+   current nonce, strictly more approvals than the scheduled request, and starts a fresh recovery period.
+5. **Finalize.** Once `executableAt` is reached, anyone can call `finalizeRecovery(wallet)` to replace the Safe's owners and
+   signing threshold through module transactions. The module must remain enabled for those transactions to succeed.
 
-Account Recovery interfaces can be built with or without a backend service:
+`cancelRecovery()` also works when no request is scheduled: it advances the nonce to invalidate pending approvals.
+Repeating a guardian confirmation for the same recovery hash does not increase its approval count or emit another `RecoveryConfirmed` event.
 
-- An interface without a backend service can simply let each guardian submit their signatures separately. Once the threshold is met, anyone can call execute recovery to start the recovery period.
+### Signatures and request queries
 
-- An interface that leverages a backend service can aggregate guardians' signatures so that only the last guardian executes the transaction and pay gas fees. This is similar to how Safe's interface works when multiple owners for a multi-sig sign transactions before submitting them.
+Off-chain approvals use the following EIP-712 type:
 
-## High-Level specs of methods
-
-We assume that the signer key belongs to its real owner. The probability of the signer key being in control of someone else should be close to zero. Under this model, we can build a simple yet highly secure non-custodial wallet. To enable that model to evolve if needed, upgrading the wallet to a new implementation requires the approval of only the owner of the account.
-
-| Method                        | Owner | Guardians | Anyone | Comment                                                                                                           |
-| ----------------------------- | ----- | --------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
-| `addGuardianWithThreshold`    | X     |           |        | Owner can add a guardian with a new threshold                                                                     |
-| `revokeGuardianWithThreshold` | X     |           |        | Owner can remove a guardian from its list of guardians                                                            |
-| `confirmRecovery`             |       | X         |        | Lets a single guardian approve the execution of the recovery request                                              |
-| `multiConfirmRecovery`        |       | X         |        | Lets multiple guardians approve the execution of the recovery request                                             |
-| `cancelRecovery`              | X     |           |        | Lets an owner cancel an ongoing recovery request and invalidate all pending guardian confirmations                |
-| `finalizeRecovery`            |       |           | X      | Finalizes an ongoing recovery request if the recovery period is over. The method is public and callable by anyone |
-
-## Audit
-
-- [Ackee Blockchain](./audit/audit-report-ackee.pdf) (version 0.0.1)
-- [Nethermind Security](./audit/audit-report-nethermind.pdf)
-- [Certora](./audit/audit-report-certora.pdf)
-
-See [audit/audit.md](./audit/audit.md) for the audited commits and notes on each report.
-
-# Development
-
-### Install dependencies
-
+```text
+ExecuteRecovery(address wallet,address[] newOwners,uint256 newThreshold,uint256 nonce)
 ```
-yarn install
+
+The domain contains the name `Social Recovery Module`, version `0.2.0`, chain ID, and deployed module address.
+Use `getRecoveryHash(...)` to obtain the digest or [test/utils/eip712_helper.ts](./test/utils/eip712_helper.ts) as a typed-data example.
+
+For `multiConfirmRecovery`, pass a nonempty array of `{ signer, signature }` entries sorted by ascending signer address,
+with no duplicate signers. It accepts ECDSA and EIP-1271 signatures. An empty signature counts as a direct confirmation
+when the signer is the caller and is a guardian. For another signer, an empty signature must pass EIP-1271 validation,
+as with a Safe guardian that has pre-approved the hash.
+
+| Query                                                                            | Returns                                                                         |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `getGuardians(wallet)`, `guardiansCount(wallet)`, `isGuardian(wallet, guardian)` | Current guardian configuration.                                                 |
+| `threshold(wallet)`                                                              | Required guardian approval count.                                               |
+| `nonce(wallet)`                                                                  | Current recovery nonce, separate from the Safe transaction nonce.               |
+| `getRecoveryRequest(wallet)`                                                     | Scheduled request, including its nonce, approval count, and `executableAt`.     |
+| `getRecoveryApprovals(wallet, newOwners, newThreshold)`                          | Approvals from current guardians at the current recovery nonce.                 |
+| `hasGuardianApproved(wallet, guardian, newOwners, newThreshold)`                 | Whether a current guardian approved the proposal at the current recovery nonce. |
+
+After scheduling advances the nonce, use `getRecoveryRequest` to inspect the scheduled request's approval count.
+
+### Safe compatibility
+
+Tests and formal verification use Safe 1.4.1 contracts and harnesses. For Safe 1.5 or later, the recovery design assumes
+that any module guard is not malicious: finalization performs several module transactions while the Safe temporarily
+has an owner threshold of one. See the [verification model boundaries](./certora/README.md#model-boundaries) for coverage limits.
+
+## Development
+
+Use Node.js 20 (the version configured in CI) and Yarn Classic (1.x). Hardhat compiles with Solidity 0.8.20 and the
+optimizer enabled for 1,000,000 runs. `SocialRecoveryModule.sol` additionally uses `viaIR`.
+
+### Install and configure
+
+```sh
+yarn install --frozen-lockfile
 ```
 
-### Add required .env variables
+For RPC, signing, explorer, or gas-report settings, copy the environment template:
 
-```
-cp .env.example .env
+```sh
+cp .env.sample .env
 ```
 
-## Run tests
+| Variable            | Use                                                       |
+| ------------------- | --------------------------------------------------------- |
+| `NODE_URL`          | Adds a `custom` Hardhat network pointing to this RPC URL. |
+| `MNEMONIC`          | Supplies accounts for configured external networks.       |
+| `INFURA_KEY`        | Used by the Infura URLs in `hardhat.config.ts`.           |
+| `ETHERSCAN_API_KEY` | Explorer verification.                                    |
+| `REPORT_GAS`        | Enables the gas reporter when set to `true`.              |
 
-```
+Local tests use Hardhat's in-process network and accounts; they do not require funded external accounts or RPC credentials.
+Network definitions are in [hardhat.config.ts](./hardhat.config.ts).
+
+### Build and test
+
+```sh
 yarn build
 yarn test
 ```
 
-## Run FV
+`yarn build` compiles Solidity and TypeScript and runs the TypeChain postbuild step. `yarn test` runs the Hardhat tests,
+compiling contracts as needed. The main suites are [GuardianStorage.spec.ts](./test/GuardianStorage.spec.ts) and
+[SocialRecoveryModule.spec.ts](./test/SocialRecoveryModule.spec.ts).
 
+Additional commands:
+
+```sh
+yarn coverage
+yarn lint
+yarn fmt
+yarn hardhat codesize --contractname SocialRecoveryModule
 ```
-certoraRun certora/conf/SocialRecoveryModule.conf
-certoraRun certora/conf/GuardianStorage.conf
-certoraRun certora/conf/RecoveryConfirmationSignatureValidity.conf
+
+`yarn lint` includes automatic TypeScript fixes; `yarn fmt` rewrites test TypeScript and Solidity formatting.
+
+The `generate:deployments` Hardhat task generates `docs/deployments.md` from [deployments.ts](./deployments.ts).
+That registry is currently empty.
+
+## Formal verification
+
+The Certora suites cover guardian storage, recovery behavior, confirmation signatures, and recovery validation.
+Install the pinned CLI and provide Java and Solidity 0.8.20 as described in [certora/README.md](./certora/README.md).
+
+```sh
+pip install -r certora/requirements.txt
+
+certoraRun certora/conf/SocialRecoveryModule.conf --compilation_steps_only
+certoraRun certora/conf/GuardianStorage.conf --compilation_steps_only
+certoraRun certora/conf/RecoveryConfirmationSignatureValidity.conf --compilation_steps_only
+certoraRun certora/conf/RecoveryValidation.conf --compilation_steps_only
 ```
 
-Note: You will need to install Certora CLI and a valid Certora Key for running FV. To provide a custom `solc` path, use `--solc` flag.
+These commands compile and type-check locally. To run proofs, set `CERTORAKEY` and replace `--compilation_steps_only`
+with `--wait_for_results all`; this submits the verification inputs to Certora's service. Use `--solc` for a custom compiler path.
 
-<!-- LICENSE -->
+See [verification results](./certora/VERIFICATION.md) for the recorded commit, suite results, and input digests,
+and [model boundaries](./certora/README.md#model-boundaries) for the assumptions and bounds of those proofs.
+The current Certora CI workflow runs the first three suites; `RecoveryValidation` is available through the command above.
+
+## Audits
+
+- [Ackee Blockchain](./audit/audit-report-ackee.pdf)
+- [Nethermind Security](./audit/audit-report-nethermind.pdf)
+- [Certora](./audit/audit-report-certora.pdf)
+
+See [audit/audit.md](./audit/audit.md) for the scope, audited commits, findings, and reviewed fixes associated with each report.
 
 ## License
 
-GNU General Public License v3.0
-
-<!-- ACKNOWLEDGMENTS -->
+The root [LICENSE](./LICENSE) contains GNU GPL v3. Individual Solidity files declare their licenses in SPDX headers,
+including GPL-3.0 and LGPL-3.0-only; `package.json` declares LGPL-3.0.
 
 ## Acknowledgments
 
-- <a href='https://github.com/eth-infinitism/account-abstraction'>eth-infinitism/account-abstraction</a>
-- <a href='https://github.com/safe-global/safe-contracts'>Gnosis Safe Contracts</a>
-- <a href='https://eips.ethereum.org/EIPS/eip-4337'>EIP-4337: Account Abstraction via Entry Point Contract specification </a>
+- [eth-infinitism/account-abstraction](https://github.com/eth-infinitism/account-abstraction)
+- [Safe Contracts](https://github.com/safe-global/safe-contracts)
+- [ERC-4337 specification](https://eips.ethereum.org/EIPS/eip-4337)
