@@ -9,7 +9,9 @@ typechain-types
 cache
 artifacts
 
-deployments/
+# hardhat-deploy typed artifacts
+/generated
+
 dist/
 
 # Foundry files

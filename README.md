@@ -90,6 +90,20 @@ yarn test
 
 Use `yarn test:gas` for gas usage statistics and `yarn coverage` for a coverage report.
 
+## Deployment
+
+```
+yarn deploy <network>
+```
+
+Networks are defined in [chains.ts](./chains.ts). Contracts are deployed deterministically (create2) through the [Safe singleton factory](https://github.com/safe-global/safe-singleton-factory), so each contract gets the same address on every supported network. Deployment records are written to `deployments/<network>`.
+
+Requires environment variables:
+- `DEPLOYER_PRIVATE_KEY`
+- `BASE_RPC_URL` and `RPC_SECRET` (for networks without a `node` in `chains.ts`)
+
+To verify a deployment, set `ETHERSCAN_API_KEY` and run `npx hardhat verify --network <network> <address> <constructor args>`.
+
 ## Run FV
 
 ```

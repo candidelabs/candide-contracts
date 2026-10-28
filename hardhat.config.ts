@@ -2,16 +2,24 @@ import "dotenv/config";
 import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import { configVariable, defineConfig, task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import type { HttpNetworkUserConfig } from "hardhat/types/config";
+import HardhatDeploy from "hardhat-deploy";
+import { chains } from "./chains.js";
 
-const sharedNetworkConfig = {
-  type: "http",
-  accounts: {
-    mnemonic: configVariable("MNEMONIC"),
-  },
-} satisfies Partial<HttpNetworkUserConfig>;
-
-const infuraUrl = (subdomain: string) => configVariable("INFURA_KEY", { format: `https://${subdomain}.infura.io/v3/{variable}` });
+const rpcUrl = (chainId: number) =>
+  process.env.BASE_RPC_URL === undefined
+    ? configVariable("BASE_RPC_URL")
+    : configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chainId}?secret={variable}` });
+const httpNetworks = Object.fromEntries(
+  Object.entries(chains).map(([name, chain]) => [
+    name,
+    {
+      type: "http" as const,
+      chainType: chain.chainType,
+      url: "node" in chain ? chain.node : rpcUrl(chain.chainId),
+      accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
+    },
+  ]),
+);
 
 const optimizedCompilerSettings = {
   version: "0.8.20",
@@ -53,7 +61,7 @@ const codesizeTask = task("codesize", "Displays the codesize of the contracts")
   .build();
 
 export default defineConfig({
-  plugins: [hardhatToolboxMochaEthers],
+  plugins: [hardhatToolboxMochaEthers, HardhatDeploy],
   tasks: [generateDeploymentsTask, codesizeTask],
   solidity: {
     profiles: {
@@ -68,6 +76,13 @@ export default defineConfig({
   typechain: {
     outDir: "typechain-types",
   },
+  generateTypedArtifacts: {
+    destinations: [
+      {
+        mode: "typescript",
+      },
+    ],
+  },
   coverage: {
     skipFiles: ["contracts/test/**"],
   },
@@ -77,44 +92,7 @@ export default defineConfig({
       allowUnlimitedContractSize: true,
       blockGasLimit: 100000000,
     },
-    gnosis: {
-      ...sharedNetworkConfig,
-      url: "https://rpc.gnosischain.com",
-    },
-    mainnet: {
-      ...sharedNetworkConfig,
-      chainType: "l1",
-      url: infuraUrl("mainnet"),
-    },
-    sepolia: {
-      ...sharedNetworkConfig,
-      chainType: "l1",
-      url: `https://ethereum-sepolia-rpc.publicnode.com`,
-    },
-    polygon: {
-      ...sharedNetworkConfig,
-      url: infuraUrl("polygon-mainnet"),
-    },
-    bsc: {
-      ...sharedNetworkConfig,
-      url: `https://bsc-dataseed.binance.org/`,
-    },
-    arbitrum: {
-      ...sharedNetworkConfig,
-      url: `https://arb1.arbitrum.io/rpc`,
-    },
-    fantomTestnet: {
-      ...sharedNetworkConfig,
-      url: `https://rpc.testnet.fantom.network/`,
-    },
-    avalanche: {
-      ...sharedNetworkConfig,
-      url: `https://api.avax.network/ext/bc/C/rpc`,
-    },
-    custom: {
-      ...sharedNetworkConfig,
-      url: configVariable("NODE_URL"),
-    },
+    ...httpNetworks,
   },
   verify: {
     etherscan: {
