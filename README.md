@@ -69,6 +69,8 @@ See [audit/audit.md](./audit/audit.md) for the audited commits and notes on each
 
 ### Install dependencies
 
+Requires Node.js 22.13 or later (Hardhat 3).
+
 ```
 yarn install
 ```
@@ -85,6 +87,8 @@ cp .env.example .env
 yarn build
 yarn test
 ```
+
+Use `yarn test:gas` for gas usage statistics and `yarn coverage` for a coverage report.
 
 ## Run FV
 
