@@ -5,17 +5,26 @@ import { ArgumentType } from "hardhat/types/arguments";
 import HardhatDeploy from "hardhat-deploy";
 import { chains } from "./chains.js";
 
-const rpcUrl = (chainId: number) =>
-  process.env.BASE_RPC_URL === undefined
-    ? configVariable("BASE_RPC_URL")
-    : configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chainId}?secret={variable}` });
+const rpcUrl = (chain: (typeof chains)[keyof typeof chains]) => {
+  const chainRpcUrl = `RPC_URL_${chain.chainId}`;
+  if (process.env[chainRpcUrl]) {
+    return configVariable(chainRpcUrl);
+  }
+  if ("node" in chain) {
+    return chain.node;
+  }
+  return process.env.BASE_RPC_URL
+    ? configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chain.chainId}?secret={variable}` })
+    : configVariable("BASE_RPC_URL");
+};
+
 const httpNetworks = Object.fromEntries(
   Object.entries(chains).map(([name, chain]) => [
     name,
     {
       type: "http" as const,
       chainType: chain.chainType,
-      url: "node" in chain ? chain.node : rpcUrl(chain.chainId),
+      url: rpcUrl(chain),
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
   ]),

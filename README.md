@@ -102,6 +102,8 @@ Requires environment variables:
 - `DEPLOYER_PRIVATE_KEY`
 - `BASE_RPC_URL` and `RPC_SECRET` (for networks without a `node` in `chains.ts`)
 
+Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) to use a specific RPC URL for a network; it takes priority over its `node` and `BASE_RPC_URL`.
+
 To verify a deployment, set `ETHERSCAN_API_KEY` and run `npx hardhat verify --network <network> <address> <constructor args>`.
 
 ## Run FV
