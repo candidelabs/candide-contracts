@@ -22,6 +22,21 @@ const optimizedCompilerSettings = {
   },
 };
 
+const buildProfile = {
+  compilers: [
+    {
+      version: "0.8.20",
+      settings: {
+        optimizer: { enabled: true, runs: 1000000 },
+        evmVersion: "paris",
+      },
+    },
+  ],
+  overrides: {
+    "contracts/modules/social_recovery/SocialRecoveryModule.sol": optimizedCompilerSettings,
+  },
+};
+
 const generateDeploymentsTask = task("generate:deployments", "Generate markdown file with deployed contract addresses")
   .setAction(() => import("./src/tasks/generate_deployments_markdown.js"))
   .build();
@@ -41,17 +56,9 @@ export default defineConfig({
   plugins: [hardhatToolboxMochaEthers],
   tasks: [generateDeploymentsTask, codesizeTask],
   solidity: {
-    compilers: [
-      {
-        version: "0.8.20",
-        settings: {
-          optimizer: { enabled: true, runs: 1000000 },
-          evmVersion: "paris",
-        },
-      },
-    ],
-    overrides: {
-      "contracts/modules/social_recovery/SocialRecoveryModule.sol": optimizedCompilerSettings,
+    profiles: {
+      default: buildProfile,
+      production: buildProfile,
     },
     npmFilesToBuild: [
       "@safe-global/safe-contracts/contracts/handler/CompatibilityFallbackHandler.sol",
