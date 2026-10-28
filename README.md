@@ -104,6 +104,8 @@ Requires environment variables:
 
 Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) to use a specific RPC URL for a network; it takes priority over its `node` and `BASE_RPC_URL`.
 
+`SCM_RECOVERY_PERIOD_ARG` sets the `SocialRecoveryModule` recovery period in seconds (defaults to 14 days). It is a constructor argument, so a different value deploys the module at a different address.
+
 To verify a deployment, set `ETHERSCAN_API_KEY` and run `npx hardhat verify --network <network> <address> <constructor args>`.
 
 ## Run FV
