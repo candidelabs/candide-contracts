@@ -12,6 +12,7 @@ artifacts
 # hardhat-deploy typed artifacts
 /generated
 
+deployments/
 dist/
 
 # Foundry files
