@@ -22,6 +22,7 @@ const httpNetworks = Object.fromEntries(
     name,
     {
       type: "http" as const,
+      chainId: chain.chainId,
       chainType: chain.chainType,
       url: rpcUrl(chain),
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
