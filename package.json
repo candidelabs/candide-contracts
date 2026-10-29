@@ -2,12 +2,11 @@
   "name": "candide-contracts",
   "version": "0.1.0-alpha.0",
   "description": "Safe{Core} Protocol modules",
-  "main": "dist/deployments.js",
   "author": "candide.labs",
   "license": "LGPL-3.0",
   "type": "module",
   "scripts": {
-    "build": "hardhat build && npm run build:ts",
+    "build": "hardhat build",
     "clean": "hardhat clean",
     "test": "hardhat test",
     "test:gas": "hardhat test --gas-stats",
@@ -19,9 +18,7 @@
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "lint:ts": "eslint 'test/**/*.ts' --max-warnings 0 --fix",
     "deploy": "hardhat deploy --network",
-    "prepack": "yarn build",
-    "prepublish": "yarn rimraf build && yarn build && yarn build:ts",
-    "build:ts": "yarn rimraf dist && tsc -p tsconfig.prod.json"
+    "prepack": "yarn build"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.2.1",

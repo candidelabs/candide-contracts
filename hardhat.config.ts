@@ -1,7 +1,6 @@
 import "dotenv/config";
 import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
-import { configVariable, defineConfig, task } from "hardhat/config";
-import { ArgumentType } from "hardhat/types/arguments";
+import { configVariable, defineConfig } from "hardhat/config";
 import HardhatDeploy from "hardhat-deploy";
 import { chains } from "./chains.js";
 
@@ -54,24 +53,8 @@ const buildProfile = {
   },
 };
 
-const generateDeploymentsTask = task("generate:deployments", "Generate markdown file with deployed contract addresses")
-  .setAction(() => import("./src/tasks/generate_deployments_markdown.js"))
-  .build();
-
-const codesizeTask = task("codesize", "Displays the codesize of the contracts")
-  .addFlag({ name: "skipcompile", description: "should not compile before printing size" })
-  .addOption({
-    name: "contractname",
-    description: "name of the contract",
-    type: ArgumentType.STRING_WITHOUT_DEFAULT,
-    defaultValue: undefined,
-  })
-  .setAction(() => import("./src/tasks/show_codesize.js"))
-  .build();
-
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthers, HardhatDeploy],
-  tasks: [generateDeploymentsTask, codesizeTask],
   solidity: {
     profiles: {
       default: buildProfile,
