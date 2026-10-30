@@ -1,0 +1,8 @@
+# Same files as .prettierignore: compiled into the deployed SocialRecoveryModule and not
+# Prettier-formatted, so solhint's prettier rule would flag them. Reformatting them would move every
+# pinned address in rocketh/expected_addresses.ts.
+contracts/interfaces/IFallbackManager.sol
+contracts/interfaces/IGuardManager.sol
+contracts/interfaces/IModuleManager.sol
+contracts/interfaces/IOwnerManager.sol
+contracts/interfaces/ISafe.sol

@@ -1,138 +1,110 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "hardhat-gas-reporter";
-import dotenv from "dotenv";
-import yargs from "yargs";
-import { HttpNetworkUserConfig } from "hardhat/types";
-import "hardhat-deploy";
-import { DeterministicDeploymentInfo } from "hardhat-deploy/dist/types";
-import { getSingletonFactoryInfo } from "@safe-global/safe-singleton-factory";
-import { ethers } from "ethers";
-import "./src/tasks/generate_deployments_markdown";
-import "./src/tasks/show_codesize";
+import "dotenv/config";
+import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import { configVariable, defineConfig } from "hardhat/config";
+import HardhatDeploy from "hardhat-deploy";
+import { chains } from "./chains.js";
 
-// Load environment variables.
-dotenv.config();
-
-const argv: any = yargs
-  .option("network", {
-    type: "string",
-    default: "hardhat",
-  })
-  .help(false)
-  .version(false).argv;
-
-const { NODE_URL, MNEMONIC, INFURA_KEY, ETHERSCAN_API_KEY } = process.env;
-
-const deterministicDeployment = (network: string): DeterministicDeploymentInfo => {
-  const info = getSingletonFactoryInfo(parseInt(network));
-  if (!info) {
-    throw new Error(`
-      Safe factory not found for network ${network}. You can request a new deployment at https://github.com/safe-global/safe-singleton-factory.
-      For more information, see https://github.com/safe-global/safe-contracts#replay-protection-eip-155
-    `);
+/**
+ * Builds the RPC url of a network, in order of priority: RPC_URL_<chainId>, the chain's `node` in
+ * chains.ts, then <BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>. Without BASE_RPC_URL, it falls
+ * back to a complete RPC_URL_<chainId>, which may then come from the keystore.
+ *
+ * The shape of the url is decided when the config loads, so RPC_URL_<chainId> and BASE_RPC_URL are
+ * read from the environment (.env). Secrets (RPC_SECRET, DEPLOYER_PRIVATE_KEY, ETHERSCAN_API_KEY)
+ * are configuration variables, resolved at connection time from the environment or the keystore.
+ *
+ * @param chain - An entry of chains.ts.
+ * @returns A fixed url, or a configuration variable resolved when the network connects.
+ */
+const rpcUrl = (chain: (typeof chains)[keyof typeof chains]) => {
+  const chainRpcUrl = `RPC_URL_${chain.chainId}`;
+  if (process.env[chainRpcUrl]) {
+    return configVariable(chainRpcUrl);
   }
-  return {
-    factory: info.address,
-    deployer: info.signerAddress,
-    funding: (ethers.toBigInt(info.gasLimit) * ethers.toBigInt(info.gasPrice)).toString(),
-    signedTx: info.transaction,
-  };
+  if ("node" in chain) {
+    return chain.node;
+  }
+  if (process.env.BASE_RPC_URL) {
+    return configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chain.chainId}?secret={variable}` });
+  }
+  // Nothing in the environment to compose a url from: require a complete per-chain url, which may
+  // then come from the keystore. A keystore BASE_RPC_URL cannot be used, since the chain id and
+  // secret could not be appended to it.
+  return configVariable(chainRpcUrl);
 };
 
-const sharedNetworkConfig: HttpNetworkUserConfig = {};
-
-sharedNetworkConfig.accounts = {
-  mnemonic: MNEMONIC || "",
-};
+const httpNetworks = Object.fromEntries(
+  Object.entries(chains).map(([name, chain]) => [
+    name,
+    {
+      type: "http" as const,
+      chainId: chain.chainId,
+      chainType: chain.chainType,
+      url: rpcUrl(chain),
+      accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
+    },
+  ]),
+);
 
 const optimizedCompilerSettings = {
   version: "0.8.20",
   settings: {
     optimizer: { enabled: true, runs: 1000000 },
+    evmVersion: "paris",
     viaIR: true,
   },
 };
 
-const config: HardhatUserConfig = {
-  solidity: {
-    compilers: [
-      {
-        version: "0.8.20",
-        settings: {
-          optimizer: { enabled: true, runs: 1000000 },
-        },
+const buildProfile = {
+  compilers: [
+    {
+      version: "0.8.20",
+      settings: {
+        optimizer: { enabled: true, runs: 1000000 },
+        evmVersion: "paris",
       },
-    ],
-    overrides: {
-      "contracts/modules/social_recovery/SocialRecoveryModule.sol": optimizedCompilerSettings,
     },
-  },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS == "true",
-  },
-  networks: {
-    hardhat: {
-      allowUnlimitedContractSize: true,
-      blockGasLimit: 100000000,
-      gas: 100000000,
-    },
-    goerli: {
-      ...sharedNetworkConfig,
-      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
-    },
-    mumbai: {
-      ...sharedNetworkConfig,
-      url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
-    },
-    gnosis: {
-      ...sharedNetworkConfig,
-      url: "https://rpc.gnosischain.com",
-    },
-    mainnet: {
-      ...sharedNetworkConfig,
-      url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
-    },
-    polygon: {
-      ...sharedNetworkConfig,
-      url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
-    },
-    bsc: {
-      ...sharedNetworkConfig,
-      url: `https://bsc-dataseed.binance.org/`,
-    },
-    arbitrum: {
-      ...sharedNetworkConfig,
-      url: `https://arb1.arbitrum.io/rpc`,
-    },
-    fantomTestnet: {
-      ...sharedNetworkConfig,
-      url: `https://rpc.testnet.fantom.network/`,
-    },
-    avalanche: {
-      ...sharedNetworkConfig,
-      url: `https://api.avax.network/ext/bc/C/rpc`,
-    },
-  },
-  deterministicDeployment,
-  etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
-  },
-  namedAccounts: {
-    deployer: {
-      default: 0,
-    },
-    owner: {
-      default: 1,
-    },
+  ],
+  overrides: {
+    "contracts/modules/social_recovery/SocialRecoveryModule.sol": optimizedCompilerSettings,
   },
 };
 
-if (NODE_URL) {
-  config.networks!.custom = {
-    ...sharedNetworkConfig,
-    url: NODE_URL,
-  };
-}
-
-export default config;
+export default defineConfig({
+  plugins: [hardhatToolboxMochaEthers, HardhatDeploy],
+  solidity: {
+    profiles: {
+      default: buildProfile,
+      production: buildProfile,
+    },
+    npmFilesToBuild: [
+      "@safe-global/safe-contracts/contracts/handler/CompatibilityFallbackHandler.sol",
+      "@safe-global/safe-contracts/contracts/libraries/SignMessageLib.sol",
+    ],
+  },
+  typechain: {
+    outDir: "typechain-types",
+  },
+  generateTypedArtifacts: {
+    destinations: [
+      {
+        mode: "typescript",
+      },
+    ],
+  },
+  coverage: {
+    skipFiles: ["contracts/test/**"],
+  },
+  networks: {
+    default: {
+      type: "edr-simulated",
+      blockGasLimit: 100000000,
+    },
+    ...httpNetworks,
+  },
+  verify: {
+    etherscan: {
+      apiKey: configVariable("ETHERSCAN_API_KEY"),
+    },
+  },
+});

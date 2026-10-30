@@ -1,5 +1,5 @@
-import { SocialRecoveryModule, TestExecutor } from "../../typechain-types";
-import { TypedDataDomain } from "ethers/src.ts/hash/typed-data";
+import type { SocialRecoveryModule, TestExecutor } from "../../typechain-types/index.js";
+import type { TypedDataDomain } from "ethers";
 
 export async function getEIP712Domain(socialRecoveryModule: SocialRecoveryModule): Promise<TypedDataDomain> {
   return {

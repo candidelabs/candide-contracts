@@ -1,0 +1,23 @@
+// chainType follows Hardhat: "l1" for Ethereum and its testnets, "op" for OP Stack chains, and
+// "generic" for every other EVM chain. It only affects simulated and forked networks.
+export const chains = {
+  // mainnets
+  ethereum: { chainId: 1, chainType: "l1" },
+  optimism: { chainId: 10, chainType: "op" },
+  bsc: { chainId: 56, chainType: "generic" },
+  gnosis: { chainId: 100, chainType: "generic", node: "https://gnosis-rpc.publicnode.com" },
+  polygon: { chainId: 137, chainType: "generic" },
+  worldchain: { chainId: 480, chainType: "op" },
+  hyperliquid: { chainId: 999, chainType: "generic" },
+  base: { chainId: 8453, chainType: "op" },
+  arbitrum: { chainId: 42161, chainType: "generic" },
+  celo: { chainId: 42220, chainType: "generic" },
+  avax: { chainId: 43114, chainType: "generic", node: "https://avalanche-c-chain-rpc.publicnode.com" },
+  // testnets
+  sepolia: { chainId: 11155111, chainType: "l1", testnet: true, node: "https://ethereum-sepolia-rpc.publicnode.com" },
+  optimismSepolia: { chainId: 11155420, chainType: "op", testnet: true },
+  baseSepolia: { chainId: 84532, chainType: "op", testnet: true },
+  polygonAmoy: { chainId: 80002, chainType: "generic", testnet: true },
+  arbitrumSepolia: { chainId: 421614, chainType: "generic", testnet: true },
+  somniaTestnet: { chainId: 50312, chainType: "generic", testnet: true, node: "https://api.infra.testnet.somnia.network" },
+} as const;

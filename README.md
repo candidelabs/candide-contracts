@@ -69,6 +69,8 @@ See [audit/audit.md](./audit/audit.md) for the audited commits and notes on each
 
 ### Install dependencies
 
+Requires Node.js 22.13 or later (Hardhat 3); `yarn install` refuses older versions.
+
 ```
 yarn install
 ```
@@ -85,6 +87,32 @@ cp .env.example .env
 yarn build
 yarn test
 ```
+
+Use `yarn test:gas` for gas usage statistics and `yarn coverage` for a coverage report.
+
+## Deployment
+
+```
+yarn deploy <network>
+```
+
+Networks are defined in [chains.ts](./chains.ts). Contracts are deployed deterministically (create2) through the [Safe singleton factory](https://github.com/safe-global/safe-singleton-factory), so each contract gets the same address on every supported network. Deployment records are written to `deployments/<network>`.
+
+The create2 address depends on the exact creation bytecode, which ends with a metadata hash solc derives from the source files and compiler settings. Any change to a source file, to its line endings or to the compiler settings moves the address, so deploy from a clean checkout; `.gitattributes` forces LF line endings for this reason.
+
+Copy `.env.sample` to `.env` for a template of every variable.
+
+Requires:
+- `DEPLOYER_PRIVATE_KEY`, in the environment or in the Hardhat keystore (`npx hardhat keystore set DEPLOYER_PRIVATE_KEY`).
+- For networks without a `node` in `chains.ts`: `BASE_RPC_URL` in the environment (`.env`) and `RPC_SECRET` in the environment or in the keystore. The network URL is `<BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>`.
+
+Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) in the environment to use a specific RPC URL for a network; it takes priority over its `node` and `BASE_RPC_URL`. If neither `RPC_URL_<chainId>` nor `BASE_RPC_URL` is in the environment, the network resolves `RPC_URL_<chainId>` from the keystore instead.
+
+`RPC_URL_<chainId>` and `BASE_RPC_URL` decide the shape of the URL when the config loads, so they are read from the environment, not from the keystore.
+
+`SocialRecoveryModule` is deployed in several variants, one per recovery period; the recovery period is a constructor argument, so each variant has its own address. The variants, with the address and runtime code hash of each, are pinned per version in [rocketh/expected_addresses.ts](./rocketh/expected_addresses.ts). A run deploys every pinned variant allowed on the network: variants marked testnet-only (the 3-minute one) are skipped on networks not tagged `testnet` in `chains.ts`. Set `SCM_RECOVERY_PERIOD_ARG` to a recovery period in seconds to deploy only that variant. The deploy script refuses a recovery period that is not pinned, a testnet-only variant on a mainnet, or a build whose address differs from the pin, and `yarn test` recomputes address and code hash of every pin of the current version from the build. The code hash is what `eth_getCode` returns at the address, so a deployed instance can be checked without compiling.
+
+To verify a deployment, set `ETHERSCAN_API_KEY` and run `npx hardhat verify --network <network> <address> <constructor args>`.
 
 ## Run FV
 

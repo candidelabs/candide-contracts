@@ -9,6 +9,9 @@ typechain-types
 cache
 artifacts
 
+# hardhat-deploy typed artifacts
+/generated
+
 deployments/
 dist/
 
