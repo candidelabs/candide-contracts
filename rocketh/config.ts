@@ -12,8 +12,11 @@ const deterministicDeployments: Map<number, Create2DeterministicDeploymentInfo> 
 for (const chainId of chainIds) {
   const info = getSingletonFactoryInfo(chainId);
   if (!info) {
-    console.warn(`WARNING: no safe singleton factory on ${chainId}`);
-    continue;
+    throw new Error(
+      `Safe singleton factory not found for chain ${chainId}. ` +
+        "Contracts are deployed through it so that they get the same address on every network. " +
+        "You can request a new deployment at https://github.com/safe-global/safe-singleton-factory.",
+    );
   }
   if (info.address.toLowerCase() !== SAFE_SINGLETON_FACTORY.toLowerCase()) {
     console.warn(`WARNING: unexpected safe singleton factory on ${chainId}`);
