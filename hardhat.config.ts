@@ -98,7 +98,6 @@ export default defineConfig({
   networks: {
     default: {
       type: "edr-simulated",
-      allowUnlimitedContractSize: true,
       blockGasLimit: 100000000,
     },
     ...httpNetworks,
