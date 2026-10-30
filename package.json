@@ -61,8 +61,8 @@
     "typescript": "~5.9.3"
   },
   "dependencies": {
-    "@account-abstraction": "git+https://github.com/eth-infinitism/account-abstraction.git#v0.6.0",
-    "@openzeppelin/contracts": "^4.9.1",
-    "@safe-global/safe-contracts": "^1.4.1-build.0"
+    "@account-abstraction": "git+https://github.com/eth-infinitism/account-abstraction.git#abff2aca61a8f0934e533d0d352978055fddbd96",
+    "@openzeppelin/contracts": "4.9.6",
+    "@safe-global/safe-contracts": "1.4.1-build.0"
   }
 }
