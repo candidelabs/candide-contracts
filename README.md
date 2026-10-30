@@ -106,11 +106,9 @@ Copy `.env.example` to `.env` for a template of every variable.
 
 Requires:
 - `DEPLOYER_PRIVATE_KEY`, in the environment or in the Hardhat keystore (`npx hardhat keystore set DEPLOYER_PRIVATE_KEY`).
-- For networks without a `node` in `chains.ts`: `BASE_RPC_URL` in the environment (`.env`) and `RPC_SECRET` in the environment or in the keystore. The network URL is `<BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>`.
+- For networks without a `node` in `chains.ts`: `RPC_URL_<chainId>` (e.g. `RPC_URL_1`), a complete RPC URL, in the environment or in the keystore.
 
-Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) in the environment to use a specific RPC URL for a network; it takes priority over its `node` and `BASE_RPC_URL`. If neither `RPC_URL_<chainId>` nor `BASE_RPC_URL` is in the environment, the network resolves `RPC_URL_<chainId>` from the keystore instead.
-
-`RPC_URL_<chainId>` and `BASE_RPC_URL` decide the shape of the URL when the config loads, so they are read from the environment, not from the keystore.
+Networks with a `node` in `chains.ts` use that public endpoint. Set `RPC_URL_<chainId>` in the environment (`.env`) to use a different one; the override is decided when the config loads, so for these networks it is read from the environment, not from the keystore.
 
 `SocialRecoveryModule` is deployed in several variants, one per recovery period; the recovery period is a constructor argument, so each variant has its own address. The variants, with the address and runtime code hash of each, are pinned per version in [rocketh/expected_addresses.ts](./rocketh/expected_addresses.ts). A run deploys every pinned variant allowed on the network: variants marked testnet-only (the 3-minute one) are skipped on networks not tagged `testnet` in `chains.ts`. Set `SCM_RECOVERY_PERIOD_ARG` to a recovery period in seconds to deploy only that variant. The deploy script refuses a recovery period that is not pinned, a testnet-only variant on a mainnet, or a build whose address differs from the pin, and `yarn test` recomputes address and code hash of every pin of the current version from the build. The code hash is what `eth_getCode` returns at the address, so a deployed instance can be checked without compiling.
 
