@@ -21,7 +21,7 @@ for (const chainId of chainIds) {
   deterministicDeployments.set(chainId, {
     factory: info.address as `0x${string}`,
     deployer: info.signerAddress as `0x${string}`,
-    funding: (info.gasLimit * info.gasPrice).toString(),
+    funding: (BigInt(info.gasLimit) * BigInt(info.gasPrice)).toString(),
     signedTx: info.transaction as `0x${string}`,
   });
 }
