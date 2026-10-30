@@ -31,6 +31,36 @@ export type ExpectedSocialRecoveryModule = {
  * move is understood.
  */
 export const SOCIAL_RECOVERY_MODULE_DEPLOYMENTS: Readonly<Record<string, readonly ExpectedSocialRecoveryModule[]>> = {
+  // Deployed from tag recovery/v0.1.0 (contract VERSION "0.0.1"). Taken from the deployed instances:
+  // addresses from https://docs.candide.dev/wallet/technical-reference/deployments, code hashes
+  // from eth_getCode on Ethereum mainnet (and Sepolia for the testnet-only variant). This
+  // repository no longer builds that version, so they are not recomputed by the tests.
+  "0.1.0": [
+    {
+      label: "3 minutes (testnets only)",
+      recoveryPeriod: 3n * 60n,
+      address: "0x949d01d424bE050D09C16025dd007CB59b3A8c66",
+      codeHash: "0x1a5e700fbb0533685dc9f9b28fc89bb496d480990e6c292f2abdd3e97485d245",
+    },
+    {
+      label: "3 days",
+      recoveryPeriod: 3n * 24n * 60n * 60n,
+      address: "0x38275826E1933303E508433dD5f289315Da2541c",
+      codeHash: "0xdbebd5942589cb48bc55fd0d804e2a825ae485fa4eb771ec030e0ec4c330ae03",
+    },
+    {
+      label: "7 days",
+      recoveryPeriod: 7n * 24n * 60n * 60n,
+      address: "0x088f6cfD8BB1dDb1BB069CCb3fc1A98927D233f2",
+      codeHash: "0xd1d497d06956a300c318dd3df28e7cbaf64dc509bf9e8674753c4f69fd50746a",
+    },
+    {
+      label: "14 days",
+      recoveryPeriod: 14n * 24n * 60n * 60n,
+      address: "0x9BacD92F4687Db306D7ded5d4513a51EA05df25b",
+      codeHash: "0xf80b3e2f6c8149da85c8c40738b9d736f538bbf8f7d386c4318d13bd8f61b02e",
+    },
+  ],
   "0.2.0": [
     {
       label: "3 minutes (testnets only)",
