@@ -14,9 +14,11 @@
     "fmt:sol": "prettier 'contracts/**/*.sol' -w",
     "fmt:ts": "prettier '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts -w",
     "fmt": "yarn fmt:ts && yarn fmt:sol",
+    "fmt:check": "prettier --check '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts 'contracts/modules/**/*.sol'",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'contracts/**/*.sol'",
-    "lint:ts": "eslint '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts --max-warnings 0 --fix",
+    "lint:ts": "eslint '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts --max-warnings 0",
+    "lint:ci": "yarn fmt:check && yarn lint:ts && solhint 'contracts/modules/**/*.sol'",
     "deploy": "hardhat deploy --network"
   },
   "devDependencies": {

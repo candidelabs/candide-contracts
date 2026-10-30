@@ -1,0 +1,8 @@
+# Sources compiled into the deployed SocialRecoveryModule that are not Prettier-formatted. Their bytes
+# are hashed into the module's bytecode metadata, so reformatting them would move every pinned address
+# in rocketh/expected_addresses.ts. Format them only together with a new module version.
+contracts/interfaces/IFallbackManager.sol
+contracts/interfaces/IGuardManager.sol
+contracts/interfaces/IModuleManager.sol
+contracts/interfaces/IOwnerManager.sol
+contracts/interfaces/ISafe.sol
