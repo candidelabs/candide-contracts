@@ -12,11 +12,11 @@
     "test:gas": "hardhat test --gas-stats",
     "coverage": "hardhat test --coverage",
     "fmt:sol": "prettier 'contracts/**/*.sol' -w",
-    "fmt:ts": "prettier 'test/**/*.ts' -w",
+    "fmt:ts": "prettier '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts -w",
     "fmt": "yarn fmt:ts && yarn fmt:sol",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'contracts/**/*.sol'",
-    "lint:ts": "eslint 'test/**/*.ts' --max-warnings 0 --fix",
+    "lint:ts": "eslint '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts --max-warnings 0 --fix",
     "deploy": "hardhat deploy --network",
     "prepack": "yarn build"
   },
