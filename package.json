@@ -1,7 +1,7 @@
 {
   "name": "candide-contracts",
-  "version": "0.1.0-alpha.0",
-  "description": "Safe{Core} Protocol modules",
+  "version": "0.2.0",
+  "description": "Candide smart contracts including social recovery module",
   "author": "candide.labs",
   "license": "LGPL-3.0",
   "type": "module",

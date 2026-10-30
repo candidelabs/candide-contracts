@@ -100,6 +100,8 @@ Networks are defined in [chains.ts](./chains.ts). Contracts are deployed determi
 
 The create2 address depends on the exact creation bytecode, which ends with a metadata hash solc derives from the source files and compiler settings. Any change to a source file, to its line endings or to the compiler settings moves the address, so deploy from a clean checkout; `.gitattributes` forces LF line endings for this reason.
 
+Copy `.env.sample` to `.env` for a template of every variable.
+
 Requires:
 - `DEPLOYER_PRIVATE_KEY`, in the environment or in the Hardhat keystore (`npx hardhat keystore set DEPLOYER_PRIVATE_KEY`).
 - For networks without a `node` in `chains.ts`: `BASE_RPC_URL` in the environment (`.env`) and `RPC_SECRET` in the environment or in the keystore. The network URL is `<BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>`.
