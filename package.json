@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "Candide smart contracts including social recovery module",
   "author": "candide.labs",
-  "license": "LGPL-3.0",
+  "license": "GPL-3.0",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
