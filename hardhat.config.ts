@@ -4,6 +4,10 @@ import { configVariable, defineConfig } from "hardhat/config";
 import HardhatDeploy from "hardhat-deploy";
 import { chains } from "./chains.js";
 
+// The shape of a network url is decided here, when the config loads, so RPC_URL_<chainId> and
+// BASE_RPC_URL are read from the environment (.env). Secrets (RPC_SECRET, DEPLOYER_PRIVATE_KEY,
+// ETHERSCAN_API_KEY) are configuration variables, resolved at connection time from the environment
+// or the hardhat keystore.
 const rpcUrl = (chain: (typeof chains)[keyof typeof chains]) => {
   const chainRpcUrl = `RPC_URL_${chain.chainId}`;
   if (process.env[chainRpcUrl]) {
@@ -12,9 +16,13 @@ const rpcUrl = (chain: (typeof chains)[keyof typeof chains]) => {
   if ("node" in chain) {
     return chain.node;
   }
-  return process.env.BASE_RPC_URL
-    ? configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chain.chainId}?secret={variable}` })
-    : configVariable("BASE_RPC_URL");
+  if (process.env.BASE_RPC_URL) {
+    return configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chain.chainId}?secret={variable}` });
+  }
+  // Nothing in the environment to compose a url from: require a complete per-chain url, which may
+  // then come from the keystore. A keystore BASE_RPC_URL cannot be used, since the chain id and
+  // secret could not be appended to it.
+  return configVariable(chainRpcUrl);
 };
 
 const httpNetworks = Object.fromEntries(

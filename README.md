@@ -98,11 +98,13 @@ yarn deploy <network>
 
 Networks are defined in [chains.ts](./chains.ts). Contracts are deployed deterministically (create2) through the [Safe singleton factory](https://github.com/safe-global/safe-singleton-factory), so each contract gets the same address on every supported network. Deployment records are written to `deployments/<network>`.
 
-Requires environment variables:
-- `DEPLOYER_PRIVATE_KEY`
-- `BASE_RPC_URL` and `RPC_SECRET` (for networks without a `node` in `chains.ts`)
+Requires:
+- `DEPLOYER_PRIVATE_KEY`, in the environment or in the Hardhat keystore (`npx hardhat keystore set DEPLOYER_PRIVATE_KEY`).
+- For networks without a `node` in `chains.ts`: `BASE_RPC_URL` in the environment (`.env`) and `RPC_SECRET` in the environment or in the keystore. The network URL is `<BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>`.
 
-Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) to use a specific RPC URL for a network; it takes priority over its `node` and `BASE_RPC_URL`.
+Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) in the environment to use a specific RPC URL for a network; it takes priority over its `node` and `BASE_RPC_URL`. If neither `RPC_URL_<chainId>` nor `BASE_RPC_URL` is in the environment, the network resolves `RPC_URL_<chainId>` from the keystore instead.
+
+`RPC_URL_<chainId>` and `BASE_RPC_URL` decide the shape of the URL when the config loads, so they are read from the environment, not from the keystore.
 
 `SCM_RECOVERY_PERIOD_ARG` sets the `SocialRecoveryModule` recovery period in seconds (defaults to 14 days). It is a constructor argument, so a different value deploys the module at a different address.
 
