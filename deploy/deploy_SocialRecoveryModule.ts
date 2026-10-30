@@ -1,3 +1,4 @@
+import { assertSingletonFactory } from "../rocketh/config.js";
 import { artifacts, deployScript } from "../rocketh/deploy.js";
 
 const RECOVERY_PERIOD = 14n * 24n * 60n * 60n; // 14 days
@@ -19,8 +20,10 @@ function getRecoveryPeriod(): bigint {
 }
 
 export default deployScript(
-  async ({ deploy, namedAccounts }) => {
+  async (env) => {
+    const { deploy, namedAccounts } = env;
     const { deployer } = namedAccounts;
+    await assertSingletonFactory(env);
     await deploy(
       "SocialRecoveryModule",
       {
