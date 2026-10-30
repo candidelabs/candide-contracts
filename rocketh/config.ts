@@ -63,8 +63,16 @@ type FactoryCheckEnvironment = {
   };
 };
 
-// On a chain whose factory is a preinstall, rocketh skips its own factory check and would try to
-// broadcast the empty transaction if the factory were missing. Check it here instead.
+/**
+ * Checks that the Safe singleton factory is in place on a chain that ships it as a preinstall.
+ *
+ * On such a chain the factory artifact has no signed deployment transaction, so rocketh cannot
+ * verify the factory and, if it were missing, would broadcast the empty transaction. On every
+ * other chain this is a no-op: rocketh checks or deploys the factory itself.
+ *
+ * @param env - The rocketh environment of the run.
+ * @throws If the chain expects a preinstalled factory and the code at its address is not the factory.
+ */
 export async function assertSingletonFactory(env: FactoryCheckEnvironment): Promise<void> {
   const chainId = env.network.chain.id;
   if (!preinstalledFactoryChainIds.has(chainId)) {

@@ -4,10 +4,18 @@ import { configVariable, defineConfig } from "hardhat/config";
 import HardhatDeploy from "hardhat-deploy";
 import { chains } from "./chains.js";
 
-// The shape of a network url is decided here, when the config loads, so RPC_URL_<chainId> and
-// BASE_RPC_URL are read from the environment (.env). Secrets (RPC_SECRET, DEPLOYER_PRIVATE_KEY,
-// ETHERSCAN_API_KEY) are configuration variables, resolved at connection time from the environment
-// or the hardhat keystore.
+/**
+ * Builds the RPC url of a network, in order of priority: RPC_URL_<chainId>, the chain's `node` in
+ * chains.ts, then <BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>. Without BASE_RPC_URL, it falls
+ * back to a complete RPC_URL_<chainId>, which may then come from the keystore.
+ *
+ * The shape of the url is decided when the config loads, so RPC_URL_<chainId> and BASE_RPC_URL are
+ * read from the environment (.env). Secrets (RPC_SECRET, DEPLOYER_PRIVATE_KEY, ETHERSCAN_API_KEY)
+ * are configuration variables, resolved at connection time from the environment or the keystore.
+ *
+ * @param chain - An entry of chains.ts.
+ * @returns A fixed url, or a configuration variable resolved when the network connects.
+ */
 const rpcUrl = (chain: (typeof chains)[keyof typeof chains]) => {
   const chainRpcUrl = `RPC_URL_${chain.chainId}`;
   if (process.env[chainRpcUrl]) {

@@ -114,10 +114,17 @@ export const SOCIAL_RECOVERY_MODULE_DEPLOYMENTS: Readonly<Record<string, readonl
 export const SOCIAL_RECOVERY_MODULE_ADDRESSES: readonly ExpectedSocialRecoveryModule[] =
   SOCIAL_RECOVERY_MODULE_DEPLOYMENTS[SOCIAL_RECOVERY_MODULE_VERSION];
 
+/**
+ * Looks up the pinned variant of the version this repository builds for a recovery period.
+ *
+ * @param recoveryPeriod - The recovery period in seconds.
+ * @returns The pinned variant, or undefined when that recovery period is not pinned.
+ */
 export function pinnedSocialRecoveryModule(recoveryPeriod: bigint): ExpectedSocialRecoveryModule | undefined {
   return SOCIAL_RECOVERY_MODULE_ADDRESSES.find((entry) => entry.recoveryPeriod === recoveryPeriod);
 }
 
+/** ABI-encodes a recovery period as the module's constructor argument, without the 0x prefix. */
 function encodeRecoveryPeriod(recoveryPeriod: bigint): string {
   return AbiCoder.defaultAbiCoder().encode(["uint256"], [recoveryPeriod]).slice(2);
 }

@@ -9,8 +9,13 @@ import { artifacts, deployScript } from "../rocketh/deploy.js";
 
 const MAX_RECOVERY_PERIOD = 2n ** 63n; // keeps block.timestamp + recoveryPeriod far below the uint64 executableAt wrap
 
-// SCM_RECOVERY_PERIOD_ARG narrows a run to the variant with that recovery period, in seconds. Unset,
-// every pinned variant allowed on the chain is deployed.
+/**
+ * Reads SCM_RECOVERY_PERIOD_ARG, which narrows a run to the variant with that recovery period.
+ *
+ * @returns The requested recovery period in seconds, or undefined when the variable is unset, in
+ * which case every pinned variant allowed on the chain is deployed.
+ * @throws If the value is not a whole number of seconds, is zero, or exceeds MAX_RECOVERY_PERIOD.
+ */
 function getRequestedRecoveryPeriod(): bigint | undefined {
   const recoveryPeriod = process.env.SCM_RECOVERY_PERIOD_ARG;
   if (!recoveryPeriod) {
@@ -29,6 +34,17 @@ function getRequestedRecoveryPeriod(): bigint | undefined {
   return seconds;
 }
 
+/**
+ * Selects the SocialRecoveryModule variants this run deploys.
+ *
+ * Without SCM_RECOVERY_PERIOD_ARG, every pinned variant is selected, minus the testnet-only ones
+ * on a chain that is not a testnet. With it, only the variant pinned for that recovery period.
+ *
+ * @param isTestnet - Whether the chain is tagged "testnet".
+ * @returns The variants to deploy, in the order they are pinned.
+ * @throws If the requested recovery period has no pinned variant, or names a testnet-only variant
+ * on a chain that is not a testnet.
+ */
 function selectVariants(isTestnet: boolean): ExpectedSocialRecoveryModule[] {
   const requested = getRequestedRecoveryPeriod();
   if (requested === undefined) {
@@ -48,6 +64,16 @@ function selectVariants(isTestnet: boolean): ExpectedSocialRecoveryModule[] {
 }
 
 export default deployScript(
+  /**
+   * Deploys the selected SocialRecoveryModule variants through the Safe singleton factory.
+   *
+   * Every variant's create2 address is computed from the artifact and checked against its pin
+   * before any transaction is sent, and the address rocketh reports is checked again after each
+   * deployment. A variant already deployed at its address is skipped by rocketh.
+   *
+   * @throws If a computed or deployed address differs from its pin, or the chain's singleton
+   * factory is missing.
+   */
   async (env) => {
     const { deploy, namedAccounts } = env;
     const { deployer } = namedAccounts;

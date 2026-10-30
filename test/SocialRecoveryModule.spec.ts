@@ -49,6 +49,15 @@ describe("SocialRecoveryModule", async () => {
     await account.exec(socialRecoveryModule.target, 0, data);
   }
 
+  /**
+   * Builds the calldata of a multiConfirmRecovery call signed by the given guardians.
+   *
+   * The `_messWith*` flags corrupt one aspect of the request so tests can check it is rejected:
+   * signer ordering, the signed nonce, or the signatures array (emptied).
+   *
+   * @param _sender - A guardian whose signature is replaced by an empty one, as the sender of the call.
+   * @returns The encoded multiConfirmRecovery calldata.
+   */
   async function _getMultiConfirmRecoveryData(
     socialRecoveryModule: SocialRecoveryModule,
     account: TestExecutor,
@@ -92,6 +101,10 @@ describe("SocialRecoveryModule", async () => {
     ]);
   }
 
+  /**
+   * Confirms a recovery without executing it: through confirmRecovery from the single guardian, or
+   * through multiConfirmRecovery sent by the first guardian when there are several.
+   */
   async function confirmRecovery(
     socialRecoveryModule: SocialRecoveryModule,
     account: TestExecutor,
@@ -141,12 +154,18 @@ describe("SocialRecoveryModule", async () => {
     await safeGuardian.connect(deployer).execTransactionFromModule(signMessageLib.target, 0, data, 1);
   }
 
+  /**
+   * Finds the first log in a transaction receipt that the module decodes as the named event.
+   *
+   * @throws If no such log is present.
+   */
   function _findLog(socialRecoveryModule: SocialRecoveryModule, logs: readonly Log[] | undefined, name: string): Log {
     const log = (logs ?? []).find((l) => socialRecoveryModule.interface.parseLog(l)?.name === name);
     if (!log) throw new Error(name + " log not found");
     return log;
   }
 
+  /** Sorts signature data by ascending signer address, the order multiConfirmRecovery requires. */
   function _sortSignatures(signatures: SocialRecoveryModule.SignatureDataStruct[]) {
     return signatures.sort((a, b) => (BigInt(a.signer as string) < BigInt(b.signer as string) ? -1 : 1));
   }
