@@ -13,6 +13,9 @@ function getRecoveryPeriod(): bigint {
     throw new Error(`SCM_RECOVERY_PERIOD_ARG must be a number of seconds, got "${recoveryPeriod}"`);
   }
   const seconds = BigInt(recoveryPeriod);
+  if (seconds === 0n) {
+    throw new Error("SCM_RECOVERY_PERIOD_ARG must be greater than 0: a zero recovery period lets a recovery finalize immediately");
+  }
   if (seconds > MAX_RECOVERY_PERIOD) {
     throw new Error(`SCM_RECOVERY_PERIOD_ARG must be at most ${MAX_RECOVERY_PERIOD} seconds, got "${recoveryPeriod}"`);
   }
