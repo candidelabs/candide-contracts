@@ -46,7 +46,7 @@ Account Recovery interfaces can be built with or without a backend service:
 
 ## High-Level specs of methods
 
-We assume that the signer key belongs to its real owner. The probability of the signer key being in control of someone else should be close to zero. Under this model, we can build a simple yet highly secure non-custodial wallet. To enable that model to evolve if needed, upgrading the wallet to a new implementation requires the approval of only the owner of the account.
+We assume that the signer key belongs to its real owner. The probability of the signer key being in control of someone else should be close to zero. Under this model, we can build a simple yet highly secure non-custodial wallet.
 
 | Method                        | Owner | Guardians | Anyone | Comment                                                                                                           |
 | ----------------------------- | ----- | --------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
