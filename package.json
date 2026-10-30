@@ -17,8 +17,7 @@
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "lint:ts": "eslint '{test,deploy,rocketh}/**/*.ts' hardhat.config.ts chains.ts --max-warnings 0 --fix",
-    "deploy": "hardhat deploy --network",
-    "prepack": "yarn build"
+    "deploy": "hardhat deploy --network"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.2.1",
