@@ -1,0 +1,3 @@
+# Line endings are part of the compiled bytecode: solc hashes the sources into the metadata
+# appended to it, so CRLF sources produce a different create2 address. Keep everything LF.
+* text=auto eol=lf

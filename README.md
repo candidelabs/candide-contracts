@@ -98,6 +98,8 @@ yarn deploy <network>
 
 Networks are defined in [chains.ts](./chains.ts). Contracts are deployed deterministically (create2) through the [Safe singleton factory](https://github.com/safe-global/safe-singleton-factory), so each contract gets the same address on every supported network. Deployment records are written to `deployments/<network>`.
 
+The create2 address depends on the exact creation bytecode, which ends with a metadata hash solc derives from the source files and compiler settings. Any change to a source file, to its line endings or to the compiler settings moves the address, so deploy from a clean checkout; `.gitattributes` forces LF line endings for this reason.
+
 Requires:
 - `DEPLOYER_PRIVATE_KEY`, in the environment or in the Hardhat keystore (`npx hardhat keystore set DEPLOYER_PRIVATE_KEY`).
 - For networks without a `node` in `chains.ts`: `BASE_RPC_URL` in the environment (`.env`) and `RPC_SECRET` in the environment or in the keystore. The network URL is `<BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>`.
