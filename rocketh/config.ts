@@ -11,6 +11,14 @@ const SAFE_SINGLETON_FACTORY_CODE =
 const HARDHAT_CHAIN_ID = 31337;
 
 const chainIds = [...Object.values(chains).map((c) => c.chainId), HARDHAT_CHAIN_ID];
+// Chains tagged "testnet": the configured testnets and the local hardhat chain. Deploy scripts read
+// the tag from env.tags to decide what may be deployed on a chain.
+const testnetChainIds = new Set<number>([
+  ...Object.values(chains)
+    .filter((c) => "testnet" in c && c.testnet)
+    .map((c) => c.chainId),
+  HARDHAT_CHAIN_ID,
+]);
 const deterministicDeployments: Map<number, Create2DeterministicDeploymentInfo> = new Map();
 // Chains (OP stack) that ship the factory as a preinstall: their artifact has no signed
 // deployment transaction, so rocketh cannot deploy the factory and can only find it in place.
@@ -43,6 +51,7 @@ const chainConfigs = Object.fromEntries(
     chainId,
     {
       deterministicDeployment: deploymentInfo,
+      tags: testnetChainIds.has(chainId) ? ["testnet"] : [],
     },
   ]),
 );
