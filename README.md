@@ -52,8 +52,10 @@ We assume that the signer key belongs to its real owner. The probability of the 
 | ----------------------------- | ----- | --------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
 | `addGuardianWithThreshold`    | X     |           |        | Owner can add a guardian with a new threshold                                                                     |
 | `revokeGuardianWithThreshold` | X     |           |        | Owner can remove a guardian from its list of guardians                                                            |
+| `changeThreshold`             | X     |           |        | Owner can change the number of guardian confirmations required for a recovery                                     |
 | `confirmRecovery`             |       | X         |        | Lets a single guardian approve the execution of the recovery request                                              |
 | `multiConfirmRecovery`        |       | X         |        | Lets multiple guardians approve the execution of the recovery request                                             |
+| `executeRecovery`             |       |           | X      | Starts the recovery period once enough guardians have confirmed the request; callable by anyone                   |
 | `cancelRecovery`              | X     |           |        | Lets an owner cancel an ongoing recovery request and invalidate all pending guardian confirmations                |
 | `finalizeRecovery`            |       |           | X      | Finalizes an ongoing recovery request if the recovery period is over. The method is public and callable by anyone |
 
