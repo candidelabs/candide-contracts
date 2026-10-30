@@ -69,7 +69,7 @@ See [audit/audit.md](./audit/audit.md) for the audited commits and notes on each
 
 ### Install dependencies
 
-Requires Node.js 22.13 or later (Hardhat 3).
+Requires Node.js 22.13 or later (Hardhat 3); `yarn install` refuses older versions.
 
 ```
 yarn install

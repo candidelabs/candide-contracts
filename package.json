@@ -5,6 +5,9 @@
   "author": "candide.labs",
   "license": "LGPL-3.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "build": "hardhat build",
     "clean": "hardhat clean",
