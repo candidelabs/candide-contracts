@@ -4,7 +4,7 @@ import * as readExecuteExtension from "@rocketh/read-execute";
 import { getSingletonFactoryInfo } from "@safe-global/safe-singleton-factory";
 import { chains } from "../chains.js";
 
-const SAFE_SINGLETON_FACTORY = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
+export const SAFE_SINGLETON_FACTORY = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 // Runtime code of the Safe singleton factory, identical on every chain.
 const SAFE_SINGLETON_FACTORY_CODE =
   "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
@@ -25,7 +25,8 @@ for (const chainId of chainIds) {
     );
   }
   if (info.address.toLowerCase() !== SAFE_SINGLETON_FACTORY.toLowerCase()) {
-    console.warn(`WARNING: unexpected safe singleton factory on ${chainId}`);
+    // The pinned addresses in rocketh/expected_addresses.ts assume this factory on every chain.
+    throw new Error(`Unexpected Safe singleton factory ${info.address} on chain ${chainId}, expected ${SAFE_SINGLETON_FACTORY}.`);
   }
   if (info.transaction === "0x") {
     preinstalledFactoryChainIds.add(chainId);

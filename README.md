@@ -108,7 +108,7 @@ Set `RPC_URL_<chainId>` (e.g. `RPC_URL_11155111`) in the environment to use a sp
 
 `RPC_URL_<chainId>` and `BASE_RPC_URL` decide the shape of the URL when the config loads, so they are read from the environment, not from the keystore.
 
-`SCM_RECOVERY_PERIOD_ARG` sets the `SocialRecoveryModule` recovery period in seconds (defaults to 14 days). It is a constructor argument, so a different value deploys the module at a different address.
+`SCM_RECOVERY_PERIOD_ARG` sets the `SocialRecoveryModule` recovery period in seconds (defaults to 14 days). It is a constructor argument, so a different value deploys the module at a different address. The address of every deployable recovery period is pinned in [rocketh/expected_addresses.ts](./rocketh/expected_addresses.ts): the deploy script refuses a recovery period that is not pinned, or a build whose address differs from the pin, and `yarn test` recomputes every pin from the build.
 
 To verify a deployment, set `ETHERSCAN_API_KEY` and run `npx hardhat verify --network <network> <address> <constructor args>`.
 

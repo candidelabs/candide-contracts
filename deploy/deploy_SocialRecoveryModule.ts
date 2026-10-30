@@ -1,4 +1,5 @@
 import { assertSingletonFactory } from "../rocketh/config.js";
+import { pinnedSocialRecoveryModule, socialRecoveryModuleAddress } from "../rocketh/expected_addresses.js";
 import { artifacts, deployScript } from "../rocketh/deploy.js";
 
 const RECOVERY_PERIOD = 14n * 24n * 60n * 60n; // 14 days
@@ -26,18 +27,41 @@ export default deployScript(
   async (env) => {
     const { deploy, namedAccounts } = env;
     const { deployer } = namedAccounts;
+    const recoveryPeriod = getRecoveryPeriod();
+
+    // Refuse to deploy anywhere but at the pinned address for this recovery period, before any
+    // transaction is sent.
+    const pinned = pinnedSocialRecoveryModule(recoveryPeriod);
+    if (!pinned) {
+      throw new Error(
+        `No pinned address for a recovery period of ${recoveryPeriod} seconds. ` +
+          "Add it to rocketh/expected_addresses.ts if this variant is meant to be deployed.",
+      );
+    }
+    const expectedAddress = socialRecoveryModuleAddress(artifacts.SocialRecoveryModule.bytecode, recoveryPeriod);
+    if (expectedAddress !== pinned.address) {
+      throw new Error(
+        `SocialRecoveryModule (${pinned.label}) would deploy at ${expectedAddress}, but its pinned address is ${pinned.address}. ` +
+          "The build does not match the sources the pin was computed from: check for a stale build, modified sources, " +
+          "CRLF line endings, or different compiler or dependency versions. Update rocketh/expected_addresses.ts only if the move is intended.",
+      );
+    }
+
     await assertSingletonFactory(env);
-    await deploy(
+    const deployment = await deploy(
       "SocialRecoveryModule",
       {
         account: deployer,
         artifact: artifacts.SocialRecoveryModule,
-        args: [getRecoveryPeriod()],
+        args: [recoveryPeriod],
       },
       {
         deterministic: true,
       },
     );
+    if (deployment.address.toLowerCase() !== pinned.address.toLowerCase()) {
+      throw new Error(`SocialRecoveryModule was deployed at ${deployment.address} instead of the pinned ${pinned.address}.`);
+    }
   },
   { tags: ["SocialRecoveryModule", "SocialRecoveryModule_deploy"] },
 );
