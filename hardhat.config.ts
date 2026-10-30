@@ -5,31 +5,21 @@ import HardhatDeploy from "hardhat-deploy";
 import { chains } from "./chains.js";
 
 /**
- * Builds the RPC url of a network, in order of priority: RPC_URL_<chainId>, the chain's `node` in
- * chains.ts, then <BASE_RPC_URL>/<chainId>?secret=<RPC_SECRET>. Without BASE_RPC_URL, it falls
- * back to a complete RPC_URL_<chainId>, which may then come from the keystore.
+ * Builds the RPC url of a network: RPC_URL_<chainId> when it is set, otherwise the chain's public
+ * `node` in chains.ts. A chain without a `node` requires RPC_URL_<chainId>.
  *
- * The shape of the url is decided when the config loads, so RPC_URL_<chainId> and BASE_RPC_URL are
- * read from the environment (.env). Secrets (RPC_SECRET, DEPLOYER_PRIVATE_KEY, ETHERSCAN_API_KEY)
- * are configuration variables, resolved at connection time from the environment or the keystore.
+ * RPC_URL_<chainId> is a configuration variable, resolved when the network connects, from the
+ * environment or the Hardhat keystore. Overriding a chain's `node` is decided when the config
+ * loads, so that override must be in the environment (.env).
  *
  * @param chain - An entry of chains.ts.
  * @returns A fixed url, or a configuration variable resolved when the network connects.
  */
 const rpcUrl = (chain: (typeof chains)[keyof typeof chains]) => {
   const chainRpcUrl = `RPC_URL_${chain.chainId}`;
-  if (process.env[chainRpcUrl]) {
-    return configVariable(chainRpcUrl);
-  }
-  if ("node" in chain) {
+  if ("node" in chain && !process.env[chainRpcUrl]) {
     return chain.node;
   }
-  if (process.env.BASE_RPC_URL) {
-    return configVariable("RPC_SECRET", { format: `${process.env.BASE_RPC_URL}/${chain.chainId}?secret={variable}` });
-  }
-  // Nothing in the environment to compose a url from: require a complete per-chain url, which may
-  // then come from the keystore. A keystore BASE_RPC_URL cannot be used, since the chain id and
-  // secret could not be appended to it.
   return configVariable(chainRpcUrl);
 };
 
